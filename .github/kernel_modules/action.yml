@@ -408,8 +408,8 @@ runs:
         cd "$KERNEL_PLATFORM"
 
         # Exports for external kernel modules
-        export BOARD_PLATFORM=kalama
-        export TARGET_BOARD_PLATFORM=kalama
+        export BOARD_PLATFORM="$SOC"
+        export TARGET_BOARD_PLATFORM="$SOC"
         export ROOT_DIR=$KERNEL_PLATFORM
 
         # LOS sources expect out to be inside kernel_platform so we set out_dir as . 
