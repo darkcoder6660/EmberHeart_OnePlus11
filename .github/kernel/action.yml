@@ -557,14 +557,14 @@ runs:
         echo "::endgroup::"
 
     - name: Add my kernel patches to common kernel
-      if: env.SOC == 'kalama' && !contains(env.MANIFEST_NAME, 'CUSTOM') && inputs.use_opt_patches == 'true'
+      if: env.SOC == 'pineapple' && !contains(env.MANIFEST_NAME, 'CUSTOM') && inputs.use_opt_patches == 'true'
       shell: bash
       run: |
         set -euo pipefail
         echo "::group::Applying my patches from my repo..."
         cd "$COMMON"
 
-        for patch_file in $KERNEL_PATCHES/kernel_patches/op11/common/*.patch; do
+        for patch_file in $KERNEL_PATCHES/kernel_patches/oppad2/common/*.patch; do
             echo "Applying patch: $patch_file"
             patch -p1 < "$patch_file"
         done
