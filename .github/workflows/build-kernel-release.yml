@@ -121,7 +121,8 @@ on:
           - OP11
           - OP11_LOS
           - POCO_F6_LOS
-        default: OP11
+          - OPPad2
+        default: OPPad2
 
 jobs:
   set-op-model:
