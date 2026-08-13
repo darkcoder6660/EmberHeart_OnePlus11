@@ -218,14 +218,14 @@ runs:
           --module CONFIG_CAN_SLCAN
 
     - name: Add my kernel patches to msm kernel
-      if: env.SOC == 'kalama' && !contains(env.MANIFEST_NAME, 'CUSTOM')
+      if: env.SOC == 'pineapple' && !contains(env.MANIFEST_NAME, 'CUSTOM')
       shell: bash
       run: |
         set -euo pipefail
         echo "Applying kernel patches to msm kernel from my repo..."
         cd "$MSM"
 
-        for patch_file in $KERNEL_PATCHES/kernel_patches/op11/msm/*.patch; do
+        for patch_file in $KERNEL_PATCHES/kernel_patches/oppad2/msm/*.patch; do
             echo "Applying patch: $patch_file"
             patch -p1 < "$patch_file"
         done
