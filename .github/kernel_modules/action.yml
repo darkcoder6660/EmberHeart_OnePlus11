@@ -243,7 +243,7 @@ runs:
         set -euo pipefail
         cd "$MSM/drivers/net/wireless/realtek/"
         rm -rf rtw88
-        git clone url?id=1lwfinger/rtw88.git
+        git clone https://github.com/lwfinger/rtw88.git
         sed -i 's/$(CONFIG_RTW88)/m/g' Makefile
         sed -i '/^source "drivers\/net\/wireless\/realtek\/rtw88\/Kconfig"$/s/.*/ /' Kconfig
 
