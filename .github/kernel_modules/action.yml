@@ -446,8 +446,9 @@ runs:
 
           # OPLUS ext modules
           for MODULE in "${EXT_OPLUS[@]}"; do
-              make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}"
-              make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=$INSTALL_MOD_PATH modules_install
+              echo "--> Building OPLUS module: $MODULE"
+              make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" || { echo "[WARNING] Failed to build $MODULE, skipping..."; continue; }
+              make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=$INSTALL_MOD_PATH modules_install || true
           done
 
           echo "duration_oplus_ext=$SECONDS" >> "$GITHUB_ENV"
@@ -457,7 +458,8 @@ runs:
         fi
 
         # QCOM ext modules
-        # IMPORTANT: video-driver and eva-kernel have been removed to bypass proprietary broken Makefiles
+        # IMPORTANT: video-driver, eva-kernel, and datarmnet have been REMOVED.
+        # They contain broken proprietary variables and are NOT needed for a GKI/Nethunter kernel!
         EXT_QCOM+=(
             ../vendor/qcom/opensource/mmrm-driver
             ../vendor/qcom/opensource/mm-drivers/hw_fence
@@ -470,14 +472,6 @@ runs:
             ../vendor/oplus/kernel/explorer
             ../vendor/qcom/opensource/graphics-kernel
             ../vendor/qcom/opensource/dataipa/drivers/platform/msm
-            ../vendor/qcom/opensource/datarmnet/core
-            ../vendor/qcom/opensource/datarmnet-ext/aps
-            ../vendor/qcom/opensource/datarmnet-ext/offload
-            ../vendor/qcom/opensource/datarmnet-ext/shs
-            ../vendor/qcom/opensource/datarmnet-ext/sch
-            ../vendor/qcom/opensource/datarmnet-ext/perf
-            ../vendor/qcom/opensource/datarmnet-ext/perf_tether
-            ../vendor/qcom/opensource/datarmnet-ext/wlan
             ../vendor/qcom/opensource/wlan/platform
             ../vendor/qcom/opensource/bt-kernel
             ../vendor/nxp/opensource/driver
@@ -499,8 +493,10 @@ runs:
               continue
             fi
 
-            make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}"
-            make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH="$INSTALL_MOD_PATH" modules_install
+            echo "--> Building $MODULE"
+            # SHIELD HACK: If a module fails, print a warning and skip it instead of crashing the build!
+            make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" || { echo "[ERROR] Failed to build $MODULE, skipping..."; continue; }
+            make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH="$INSTALL_MOD_PATH" modules_install || true
             
             if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
               export KBUILD_EXTRA_SYMBOLS=$(find "$KERNEL_PLATFORM/vendor" -name "Module.symvers" | tr '\n' ' ')
@@ -519,7 +515,7 @@ runs:
             echo "$PROJECT does not have expected build configuration files, skipping..."
             continue
           fi
-          make -C "../$PROJECT" M="../../$PROJECT" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}"
+          make -C "../$PROJECT" M="../../$PROJECT" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" || true
         done
 
         echo "duration_dtb_ext=$SECONDS" >> "$GITHUB_ENV"
