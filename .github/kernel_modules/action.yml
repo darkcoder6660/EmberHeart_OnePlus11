@@ -186,6 +186,7 @@ runs:
         # ATH drivers
         ./scripts/config --file arch/arm64/configs/gki_defconfig \
           --enable CONFIG_WLAN_VENDOR_ATH \
+          --module CONFIG_ATH_CARDS \
           --module CONFIG_ATH_COMMON \
           --module CONFIG_ATH9K \
           --module CONFIG_ATH9K_HW \
