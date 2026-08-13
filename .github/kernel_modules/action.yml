@@ -434,6 +434,7 @@ runs:
 
         MAKE_FLAGS+=(
           KERNEL_SRC="$ROOT_DIR/$KERNEL_DIR"
+          OUT_DIR="$OUT_DIR"
         )
 
         if [ -f "$KERNEL_PLATFORM/oplus/config/modules.ext.$KERNEL_VER.oplus" ]; then
