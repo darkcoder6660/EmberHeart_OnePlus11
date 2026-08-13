@@ -495,8 +495,9 @@ runs:
         echo "Applying foolproof root hack for broken QCOM variables..."
         sudo mkdir -p /driver/vidc/inc
         sudo mkdir -p /msm_video/driver
+        sudo mkdir -p /video/driver
         sudo mkdir -p /eva
-        sudo chmod -R 777 /driver /msm_video /eva || true
+        sudo chmod -R 777 /driver /msm_video /video /eva || true
         # -------------------------------------------
 
         echo "Compiling vendor modules (qcom)"
