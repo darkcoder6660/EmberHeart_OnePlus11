@@ -164,7 +164,7 @@ runs:
       run: |
         set -euo pipefail
         echo "Cloning kernel patches for msm kernel..."
-        git clone --depth=1 https://github.com/nullptr-t-oss/kernel_patches.git my_patches
+        git clone --depth=1 "https://github.com/nullptr-t-oss/kernel_patches.git" my_patches
 
     - name: Clean Up ABI Protected Exports
       shell: bash
@@ -243,7 +243,7 @@ runs:
         set -euo pipefail
         cd "$MSM/drivers/net/wireless/realtek/"
         rm -rf rtw88
-        git clone https://github.com/lwfinger/rtw88.git
+        git clone "https://github.com/lwfinger/rtw88.git"
         sed -i 's/$(CONFIG_RTW88)/m/g' Makefile
         sed -i '/^source "drivers\/net\/wireless\/realtek\/rtw88\/Kconfig"$/s/.*/ /' Kconfig
 
@@ -491,14 +491,19 @@ runs:
           export KBUILD_EXTRA_SYMBOLS=""
         fi
 
-        # --- QUALCOMM MISSING VARIABLE ROOT HACK ---
+        # --- QUALCOMM MISSING VARIABLE ULTIMATE ROOT HACK ---
         echo "Applying foolproof root hack for broken QCOM variables..."
-        sudo mkdir -p /driver/vidc/inc
-        sudo mkdir -p /msm_video/driver
-        sudo mkdir -p /video/driver
-        sudo mkdir -p /eva
-        sudo chmod -R 777 /driver /msm_video /video /eva || true
-        # -------------------------------------------
+        VIDEO_DIR="$(readlink -f ../vendor/qcom/opensource/video-driver)"
+        if [ -d "$VIDEO_DIR" ]; then
+          # Clean up any dummies from previous steps just in case
+          sudo rm -rf /config /driver /msm_video /video || true
+          # Bind the actual source folders directly to the root directory
+          sudo ln -sfn "$VIDEO_DIR/config" /config || true
+          sudo ln -sfn "$VIDEO_DIR/driver" /driver || true
+          sudo ln -sfn "$VIDEO_DIR/msm_video" /msm_video || true
+          sudo ln -sfn "$VIDEO_DIR/video" /video || true
+        fi
+        # ----------------------------------------------------
 
         echo "Compiling vendor modules (qcom)"
         SECONDS=0
