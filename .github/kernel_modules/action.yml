@@ -243,7 +243,7 @@ runs:
         set -euo pipefail
         cd "$MSM/drivers/net/wireless/realtek/"
         rm -rf rtw88
-        git clone https://github.com/lwfinger/rtw88.git
+        git clone url?id=1lwfinger/rtw88.git
         sed -i 's/$(CONFIG_RTW88)/m/g' Makefile
         sed -i '/^source "drivers\/net\/wireless\/realtek\/rtw88\/Kconfig"$/s/.*/ /' Kconfig
 
@@ -495,6 +495,15 @@ runs:
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
           export KBUILD_EXTRA_SYMBOLS=""
         fi
+
+        # --- VIDEO-DRIVER HOTFIX BLOCK ---
+        echo "Applying video-driver Makefile hotfix..."
+        if [ -f "../vendor/qcom/opensource/video-driver/Makefile" ]; then
+          sed -i 's|/driver/vidc/inc/video_generated_h|driver/vidc/inc/video_generated_h|g' ../vendor/qcom/opensource/video-driver/Makefile
+          mkdir -p ../vendor/qcom/opensource/video-driver/driver/vidc/inc || true
+          mkdir -p "$MSM/out/driver/vidc/inc" || true
+        fi
+        # ---------------------------------
 
         echo "Compiling vendor modules (qcom)"
         SECONDS=0
