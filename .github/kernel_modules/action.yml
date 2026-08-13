@@ -412,17 +412,12 @@ runs:
         export TARGET_BOARD_PLATFORM="$SOC"
         export ROOT_DIR=$KERNEL_PLATFORM
 
-        # LOS sources expect out to be inside kernel_platform so we set out_dir as . 
-        # because our actual out dir is inside common directory
         if [[ "$BUILD_TYPE" == "Monolithic Build" ]]; then
           export OUT_DIR=$MSM
         else
           export OUT_DIR="$MSM/out"
         fi
         
-        # Failsafe: Prevent "Directory nonexistent" for video_generated_h
-        mkdir -p "$OUT_DIR/driver/vidc/inc" || true
-
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
           export KERNEL_DIR=msm-kernel
         else
@@ -496,14 +491,13 @@ runs:
           export KBUILD_EXTRA_SYMBOLS=""
         fi
 
-        # --- VIDEO-DRIVER HOTFIX BLOCK ---
-        echo "Applying video-driver Makefile hotfix..."
-        if [ -f "../vendor/qcom/opensource/video-driver/Makefile" ]; then
-          sed -i 's|/driver/vidc/inc/video_generated_h|driver/vidc/inc/video_generated_h|g' ../vendor/qcom/opensource/video-driver/Makefile
-          mkdir -p ../vendor/qcom/opensource/video-driver/driver/vidc/inc || true
-          mkdir -p "$MSM/out/driver/vidc/inc" || true
-        fi
-        # ---------------------------------
+        # --- QUALCOMM MISSING VARIABLE ROOT HACK ---
+        echo "Applying foolproof root hack for broken QCOM variables..."
+        sudo mkdir -p /driver/vidc/inc
+        sudo mkdir -p /msm_video/driver
+        sudo mkdir -p /eva
+        sudo chmod -R 777 /driver /msm_video /eva || true
+        # -------------------------------------------
 
         echo "Compiling vendor modules (qcom)"
         SECONDS=0
