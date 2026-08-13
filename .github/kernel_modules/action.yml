@@ -416,7 +416,12 @@ runs:
         # because our actual out dir is inside common directory
         if [[ "$BUILD_TYPE" == "Monolithic Build" ]]; then
           export OUT_DIR=$MSM
+        else
+          export OUT_DIR="$MSM/out"
         fi
+        
+        # Failsafe: Prevent "Directory nonexistent" for video_generated_h
+        mkdir -p "$OUT_DIR/driver/vidc/inc" || true
 
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
           export KERNEL_DIR=msm-kernel
