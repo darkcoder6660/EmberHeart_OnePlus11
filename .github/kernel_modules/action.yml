@@ -457,6 +457,7 @@ runs:
         fi
 
         # QCOM ext modules
+        # IMPORTANT: video-driver and eva-kernel have been removed to bypass proprietary broken Makefiles
         EXT_QCOM+=(
             ../vendor/qcom/opensource/mmrm-driver
             ../vendor/qcom/opensource/mm-drivers/hw_fence
@@ -467,7 +468,6 @@ runs:
             ../vendor/qcom/opensource/audio-kernel
             ../vendor/qcom/opensource/camera-kernel
             ../vendor/oplus/kernel/explorer
-            ../vendor/qcom/opensource/video-driver
             ../vendor/qcom/opensource/graphics-kernel
             ../vendor/qcom/opensource/dataipa/drivers/platform/msm
             ../vendor/qcom/opensource/datarmnet/core
@@ -478,7 +478,6 @@ runs:
             ../vendor/qcom/opensource/datarmnet-ext/perf
             ../vendor/qcom/opensource/datarmnet-ext/perf_tether
             ../vendor/qcom/opensource/datarmnet-ext/wlan
-            ../vendor/qcom/opensource/eva-kernel
             ../vendor/qcom/opensource/wlan/platform
             ../vendor/qcom/opensource/bt-kernel
             ../vendor/nxp/opensource/driver
@@ -490,20 +489,6 @@ runs:
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
           export KBUILD_EXTRA_SYMBOLS=""
         fi
-
-        # --- QUALCOMM MISSING VARIABLE ULTIMATE ROOT HACK ---
-        echo "Applying foolproof root hack for broken QCOM variables..."
-        VIDEO_DIR="$(readlink -f ../vendor/qcom/opensource/video-driver)"
-        if [ -d "$VIDEO_DIR" ]; then
-          # Clean up any dummies from previous steps just in case
-          sudo rm -rf /config /driver /msm_video /video || true
-          # Bind the actual source folders directly to the root directory
-          sudo ln -sfn "$VIDEO_DIR/config" /config || true
-          sudo ln -sfn "$VIDEO_DIR/driver" /driver || true
-          sudo ln -sfn "$VIDEO_DIR/msm_video" /msm_video || true
-          sudo ln -sfn "$VIDEO_DIR/video" /video || true
-        fi
-        # ----------------------------------------------------
 
         echo "Compiling vendor modules (qcom)"
         SECONDS=0
