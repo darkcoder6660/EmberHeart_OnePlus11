@@ -252,8 +252,12 @@ jobs:
 
       - name: Fix LineageOS Missing Kconfig Error
         run: |
-          echo "Removing proprietary kernelFwUpdate references from Kconfig..."
-          find . -name "Kconfig" -path "*/drivers/base/Kconfig" -exec sed -i '/kernelFwUpdate/d' {} + || true
+          echo "Creating dummy Kconfig to bypass missing proprietary folders..."
+          mkdir -p ${{ matrix.model }}/kernel_platform/msm-kernel/drivers/base/kernelFwUpdate
+          echo "# Dummy file" > ${{ matrix.model }}/kernel_platform/msm-kernel/drivers/base/kernelFwUpdate/Kconfig
+          
+          mkdir -p ${{ matrix.model }}/kernel_platform/common/drivers/base/kernelFwUpdate
+          echo "# Dummy file" > ${{ matrix.model }}/kernel_platform/common/drivers/base/kernelFwUpdate/Kconfig
 
       - name: Build Kernel Modules
         id: build_modules
