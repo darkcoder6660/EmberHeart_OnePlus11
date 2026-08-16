@@ -1174,7 +1174,7 @@ runs:
 
         avbtool add_hash_footer \
           --partition_name boot \
-          --partition_size "$BOOT_PARTITION_SIZE" \
+          --partition_size "${BOOT_PARTITION_SIZE:-104857600}" \
           --image "$OUT/boot.img" \
           --algorithm "SHA256_RSA4096" \
           --key "$KERNEL_PLATFORM/tools/mkbootimg/gki/testdata/testkey_rsa4096.pem"
