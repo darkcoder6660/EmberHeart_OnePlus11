@@ -252,9 +252,11 @@ jobs:
 
       - name: Fix LineageOS Missing Kconfig Error
         run: |
-          echo "Deleting broken proprietary references from Kconfig..."
-          sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' ${{ matrix.model }}/kernel_platform/msm-kernel/drivers/base/Kconfig || true
-          sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' ${{ matrix.model }}/kernel_platform/common/drivers/base/Kconfig || true
+          echo "Scanning entire workspace to scrub broken LineageOS references..."
+          find . -type f -name "Kconfig" -exec sed -i '/kernelFwUpdate/d' {} + || true
+          find . -type f -name "Kconfig" -exec sed -i '/touchpanel_notify/d' {} + || true
+          find . -type f -name "Makefile" -exec sed -i '/kernelFwUpdate/d' {} + || true
+          find . -type f -name "Makefile" -exec sed -i '/touchpanel_notify/d' {} + || true
 
       - name: Build Kernel Modules
         id: build_modules
