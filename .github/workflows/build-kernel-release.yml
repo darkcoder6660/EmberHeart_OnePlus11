@@ -252,15 +252,13 @@ jobs:
 
       - name: Fix LineageOS Missing Kconfig Error
         run: |
-          echo "Aggressively scrubbing ALL known proprietary OnePlus references..."
-          find ${{ matrix.model }}/kernel_platform -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/aw8697_haptic/d' -e '/aac_haptic/d' -e '/richtap_haptic/d' -e '/oplus_chg/d' {} + || true
-
-          echo "Dynamically generating missing Kconfig files to prevent parser crashes..."
+          echo "Omniscient Dummy Generator: Scanning and fixing all missing Kconfigs regardless of indentation..."
           
           # Fix for msm-kernel
           cd ${{ matrix.model }}/kernel_platform/msm-kernel
-          grep -r '^source ' . | awk '{print $2}' | tr -d '"' | sort -u | while read -r missing; do
+          grep -rho 'source "[^"]*"' . --include="Kconfig*" | cut -d'"' -f2 | sort -u | while read -r missing; do
             if [ ! -f "$missing" ] && [ ! -f "../common/$missing" ]; then
+              echo "Creating dummy Kconfig for: $missing"
               mkdir -p "$(dirname "$missing")" || true
               touch "$missing" || true
             fi
@@ -268,8 +266,9 @@ jobs:
           
           # Fix for common
           cd ../common
-          grep -r '^source ' . | awk '{print $2}' | tr -d '"' | sort -u | while read -r missing; do
+          grep -rho 'source "[^"]*"' . --include="Kconfig*" | cut -d'"' -f2 | sort -u | while read -r missing; do
             if [ ! -f "$missing" ] && [ ! -f "../msm-kernel/$missing" ]; then
+              echo "Creating dummy Kconfig for: $missing"
               mkdir -p "$(dirname "$missing")" || true
               touch "$missing" || true
             fi
