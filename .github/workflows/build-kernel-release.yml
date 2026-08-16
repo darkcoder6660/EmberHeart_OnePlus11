@@ -1,3 +1,4 @@
+
 name: Build and Release OnePlus EmberHeart Kernel and Kernel Modules
 
 permissions:
@@ -250,38 +251,36 @@ jobs:
           kernel_uname: ${{ inputs.kernel_uname }}
           compile_dlkm: ${{ inputs.compile_dlkm }}
 
-      - name: Fix LineageOS Missing Kconfig Error
+      - name: Fix LineageOS Missing Kconfig Error (The REAL Fix)
         run: |
-          echo "Executing the ultimate fallback: scrubbing references AND explicitly generating dummies..."
-          cd ${{ matrix.model }}/kernel_platform
+          echo "Applying invincible dummy files and permanently committing them to git history to survive build resets..."
           
-          # 1. Scrub all references from real Kconfig and Makefiles
-          find . -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i \
-            -e '/kernelFwUpdate/d' \
-            -e '/touchpanel_notify/d' \
-            -e '/si_haptic/d' \
-            -e '/aw8697_haptic/d' \
-            -e '/aac_haptic/d' \
-            -e '/richtap_haptic/d' \
-            -e '/oplus_/d' \
-            {} + || true
-            
-          # 2. Create actual dummy files, blasting through any broken symlinks
-          for dir in \
-            "drivers/base/kernelFwUpdate" \
-            "drivers/base/touchpanel_notify" \
-            "drivers/misc/vibrator/si_haptic" \
-            "drivers/misc/vibrator/aw8697_haptic" \
-            "drivers/misc/vibrator/aac_haptic" \
-            "drivers/misc/vibrator/richtap_haptic" ; do
-            
-            for tree in "common" "msm-kernel"; do
-              rm -rf "$tree/$dir"
-              mkdir -p "$tree/$dir"
-              echo "# dummy" > "$tree/$dir/Kconfig"
-              echo "# dummy" > "$tree/$dir/Makefile"
-            done
+          # 1. Fix msm-kernel
+          cd ${{ matrix.model }}/kernel_platform/msm-kernel
+          git config --global user.email "bot@example.com"
+          git config --global user.name "Bot"
+          
+          for dir in "drivers/base/kernelFwUpdate" "drivers/base/touchpanel_notify" "drivers/misc/vibrator/si_haptic" "drivers/misc/vibrator/aw8697_haptic" "drivers/misc/vibrator/aac_haptic" "drivers/misc/vibrator/richtap_haptic"; do
+            mkdir -p "$dir"
+            echo "# dummy" > "$dir/Kconfig"
+            echo "# dummy" > "$dir/Makefile"
           done
+          find . -name "Kconfig*" -type f -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/haptic/d' -e '/oplus/d' {} + || true
+          
+          git add .
+          git commit -m "Bake dummy files into git history so they survive module syncs" || true
+
+          # 2. Fix common
+          cd ../common
+          for dir in "drivers/base/kernelFwUpdate" "drivers/base/touchpanel_notify" "drivers/misc/vibrator/si_haptic" "drivers/misc/vibrator/aw8697_haptic" "drivers/misc/vibrator/aac_haptic" "drivers/misc/vibrator/richtap_haptic"; do
+            mkdir -p "$dir"
+            echo "# dummy" > "$dir/Kconfig"
+            echo "# dummy" > "$dir/Makefile"
+          done
+          find . -name "Kconfig*" -type f -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/haptic/d' -e '/oplus/d' {} + || true
+          
+          git add .
+          git commit -m "Bake dummy files into git history so they survive module syncs" || true
 
       - name: Build Kernel Modules
         id: build_modules
