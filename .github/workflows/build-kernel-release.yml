@@ -252,26 +252,35 @@ jobs:
 
       - name: Fix LineageOS Missing Kconfig Error
         run: |
-          echo "Omniscient Dummy Generator: Scanning and fixing all missing Kconfigs regardless of indentation..."
+          echo "Executing the ultimate fallback: scrubbing references AND explicitly generating dummies..."
+          cd ${{ matrix.model }}/kernel_platform
           
-          # Fix for msm-kernel
-          cd ${{ matrix.model }}/kernel_platform/msm-kernel
-          grep -rho 'source "[^"]*"' . --include="Kconfig*" | cut -d'"' -f2 | sort -u | while read -r missing; do
-            if [ ! -f "$missing" ] && [ ! -f "../common/$missing" ]; then
-              echo "Creating dummy Kconfig for: $missing"
-              mkdir -p "$(dirname "$missing")" || true
-              touch "$missing" || true
-            fi
-          done
-          
-          # Fix for common
-          cd ../common
-          grep -rho 'source "[^"]*"' . --include="Kconfig*" | cut -d'"' -f2 | sort -u | while read -r missing; do
-            if [ ! -f "$missing" ] && [ ! -f "../msm-kernel/$missing" ]; then
-              echo "Creating dummy Kconfig for: $missing"
-              mkdir -p "$(dirname "$missing")" || true
-              touch "$missing" || true
-            fi
+          # 1. Scrub all references from real Kconfig and Makefiles
+          find . -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i \
+            -e '/kernelFwUpdate/d' \
+            -e '/touchpanel_notify/d' \
+            -e '/si_haptic/d' \
+            -e '/aw8697_haptic/d' \
+            -e '/aac_haptic/d' \
+            -e '/richtap_haptic/d' \
+            -e '/oplus_/d' \
+            {} + || true
+            
+          # 2. Create actual dummy files, blasting through any broken symlinks
+          for dir in \
+            "drivers/base/kernelFwUpdate" \
+            "drivers/base/touchpanel_notify" \
+            "drivers/misc/vibrator/si_haptic" \
+            "drivers/misc/vibrator/aw8697_haptic" \
+            "drivers/misc/vibrator/aac_haptic" \
+            "drivers/misc/vibrator/richtap_haptic" ; do
+            
+            for tree in "common" "msm-kernel"; do
+              rm -rf "$tree/$dir"
+              mkdir -p "$tree/$dir"
+              echo "# dummy" > "$tree/$dir/Kconfig"
+              echo "# dummy" > "$tree/$dir/Makefile"
+            done
           done
 
       - name: Build Kernel Modules
