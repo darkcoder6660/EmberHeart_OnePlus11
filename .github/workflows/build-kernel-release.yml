@@ -252,11 +252,28 @@ jobs:
 
       - name: Fix LineageOS Missing Kconfig Error
         run: |
-          echo "Scanning entire workspace to scrub broken LineageOS references..."
-          find . -type f -name "Kconfig" -exec sed -i '/kernelFwUpdate/d' {} + || true
-          find . -type f -name "Kconfig" -exec sed -i '/touchpanel_notify/d' {} + || true
-          find . -type f -name "Makefile" -exec sed -i '/kernelFwUpdate/d' {} + || true
-          find . -type f -name "Makefile" -exec sed -i '/touchpanel_notify/d' {} + || true
+          echo "Aggressively scrubbing ALL known proprietary OnePlus references..."
+          find ${{ matrix.model }}/kernel_platform -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/aw8697_haptic/d' -e '/aac_haptic/d' -e '/richtap_haptic/d' -e '/oplus_chg/d' {} + || true
+
+          echo "Dynamically generating missing Kconfig files to prevent parser crashes..."
+          
+          # Fix for msm-kernel
+          cd ${{ matrix.model }}/kernel_platform/msm-kernel
+          grep -r '^source ' . | awk '{print $2}' | tr -d '"' | sort -u | while read -r missing; do
+            if [ ! -f "$missing" ] && [ ! -f "../common/$missing" ]; then
+              mkdir -p "$(dirname "$missing")" || true
+              touch "$missing" || true
+            fi
+          done
+          
+          # Fix for common
+          cd ../common
+          grep -r '^source ' . | awk '{print $2}' | tr -d '"' | sort -u | while read -r missing; do
+            if [ ! -f "$missing" ] && [ ! -f "../msm-kernel/$missing" ]; then
+              mkdir -p "$(dirname "$missing")" || true
+              touch "$missing" || true
+            fi
+          done
 
       - name: Build Kernel Modules
         id: build_modules
