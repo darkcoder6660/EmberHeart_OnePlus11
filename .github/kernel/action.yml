@@ -71,6 +71,12 @@ runs:
       run: |
         set -euo pipefail
         cd "$COMMON"
+
+        # --- VERSION SPOOFING HACK ---
+        echo "Spoofing Kernel Version to 6.1.173 to match LineageOS..."
+        sed -i 's/^SUBLEVEL = .*/SUBLEVEL = 173/' Makefile
+        # -----------------------------
+
         CONFIG_FILES=("build.config.common" "build.config.constants")
         BRANCH_LINE=""
         for f in "${CONFIG_FILES[@]}"; do
@@ -267,6 +273,7 @@ runs:
         echo "susfs_version=${susfs_version:-unknown}" >> $GITHUB_OUTPUT
         echo "SuSFS Version: $susfs_version"
         cd ../
+        
         # Function to compare semantic versions
         version_lte() {
           [ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" = "$1" ]
@@ -282,7 +289,7 @@ runs:
           "v1.5.8")
             cd ./KernelSU-Next
             cp ../../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-            patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch  || true
+            patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
             cp "$WILD_KERNEL_PATCHES/next/susfs_fix_patches/$susfs_version/fix_apk_sign.c.patch" ./
             patch -p1 --forward --fuzz=3 < fix_apk_sign.c.patch
             cp "$WILD_KERNEL_PATCHES/next/susfs_fix_patches/$susfs_version/fix_core_hook.c.patch" ./
@@ -295,7 +302,7 @@ runs:
           "v1.5.9"|"v1.5.10"|"v1.5.11"|"v1.5.12")
             cd ./KernelSU-Next
             cp ../../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-            patch -p1 --forward < 10_enable_susfs_for_ksu.patch  || true
+            patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
             for file in $(find ./kernel -maxdepth 2 -name "*.rej" -printf "%f\n" | cut -d'.' -f1); do
               echo "Patching file: $file.c with fix_$file.c.patch"
               patch -p1 --forward < "$WILD_KERNEL_PATCHES/next/susfs_fix_patches/$susfs_version/fix_$file.c.patch"
@@ -306,7 +313,7 @@ runs:
             cd ./KernelSU-Next
             cp ../../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
 
-            patch -p1 --forward < 10_enable_susfs_for_ksu.patch  || true
+            patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
 
             for file in $(find ./kernel -maxdepth 2 -name "*.rej" -exec basename {} .rej \;); do
               echo "Patching file: $file with fix_$file.patch"
@@ -344,7 +351,8 @@ runs:
             exit 1
             ;;
         esac
-        cd $COMMON
+        
+        cd "$COMMON"
         if [ "${{ env.ANDROID_RELEASE }}" = "android15" ] && [ "${{ env.KERNEL_VER }}" = "6.6" ]; then
           if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
             sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
@@ -353,6 +361,8 @@ runs:
 
         # Fake kernel patch to fix failures
         fake_patched=0
+        fake_patched_expand=0
+        
         if [ "${{ env.ANDROID_RELEASE }}" = "android15" ] && [ "${{ env.KERNEL_VER }}" = "6.6" ]; then
           if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
             echo "nr_subpages Line not found. Fake Patching!"
@@ -362,20 +372,19 @@ runs:
         fi
 
         if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
-            echo "#include <linux/dma-buf.h> Line not found. Adding missing header"
-            sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
-          fi
-          
-          if ! grep -qxF '#include <linux/zswap.h>' ./mm/memory.c; then
-            echo "#include <linux/zswap.h> Line not found. Adding missing header"
-            sed -i '/#include <linux\/sched\/sysctl.h>/a #include <linux\/zswap.h>' ./mm/memory.c
-          fi
-          
-          if grep -qF 'if (vma->vm_end > last_vma_end)' ./fs/proc/task_mmu.c && ! grep -qxF 'SUSFS_IS_INODE_SUS_MAP' ./fs/proc/task_mmu.c; then
-            echo "Temporarily expand the `last_vma_end` `if` block to fix a matching issue."
-            perl -i -0pe 's/\t\t\tif \(vma->vm_end > last_vma_end\)\n\t\t\t\tsmap_gather_stats\(vma, &mss, last_vma_end\);/\t\t\tif (vma->vm_end > last_vma_end) {\n\t\t\t\tsmap_gather_stats(vma, \&mss, last_vma_end);\n\t\t\t\tlast_vma_end = vma->vm_end;\n\t\t\t}/' ./fs/proc/task_mmu.c
-            fake_patched_expand=1
-          fi
+          echo "#include <linux/dma-buf.h> Line not found. Adding missing header"
+          sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+        fi
+        
+        if ! grep -qxF '#include <linux/zswap.h>' ./mm/memory.c; then
+          echo "#include <linux/zswap.h> Line not found. Adding missing header"
+          sed -i '/#include <linux\/sched\/sysctl.h>/a #include <linux\/zswap.h>' ./mm/memory.c
+        fi
+        
+        if grep -qF 'if (vma->vm_end > last_vma_end)' ./fs/proc/task_mmu.c && ! grep -qxF 'SUSFS_IS_INODE_SUS_MAP' ./fs/proc/task_mmu.c; then
+          echo "Temporarily expand the last_vma_end if block to fix a matching issue."
+          perl -i -0pe 's/\t\t\tif \(vma->vm_end > last_vma_end\)\n\t\t\t\tsmap_gather_stats\(vma, &mss, last_vma_end\);/\t\t\tif (vma->vm_end > last_vma_end) {\n\t\t\t\tsmap_gather_stats(vma, \&mss, last_vma_end);\n\t\t\t\tlast_vma_end = vma->vm_end;\n\t\t\t}/' ./fs/proc/task_mmu.c
+          fake_patched_expand=1
         fi
 
         if [ "${{ env.ANDROID_RELEASE }}" = "android12" ] && [ "${{ env.KERNEL_VER }}" = "5.10" ]; then
@@ -479,7 +488,7 @@ runs:
         echo "::group::Adding BBG"
         cd "$KERNEL_PLATFORM"
         echo "Adding BBG..."
-        if ! wget -q -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash -s main; then
+        if ! wget -q -O- https://raw.githubusercontent.com/vc-teahouse/Baseband-guard/main/setup.sh | bash -s main; then
           echo "::warning::BBG setup script failed, continuing anyway"
         fi
         cd "$COMMON"
@@ -565,8 +574,10 @@ runs:
         cd "$COMMON"
 
         for patch_file in $KERNEL_PATCHES/kernel_patches/oppad2/common/*.patch; do
+          if [ -f "$patch_file" ]; then
             echo "Applying patch: $patch_file"
             patch -p1 < "$patch_file"
+          fi
         done
 
         echo "My kernel patches applied ❤️‍🔥"
@@ -633,6 +644,13 @@ runs:
         set -euo pipefail
         echo "::group::Applying Nethunter configs..."
         cd "$COMMON"
+
+        # Prevent symbol trimming for loadable wireless modules
+        ./scripts/config --file arch/arm64/configs/gki_defconfig \
+          --disable CONFIG_TRIM_UNUSED_KSYMS \
+          --enable CONFIG_MODULES \
+          --enable CONFIG_MODULE_UNLOAD \
+          --enable CONFIG_CFG80211
 
         # Bluetooth configs
         ./scripts/config --file arch/arm64/configs/gki_defconfig \
@@ -752,13 +770,11 @@ runs:
                 patch -p1 --forward < "$WILD_KERNEL_PATCHES/common/droidspaces/fix_abi_padding_for_posix_mqueue.patch"
               fi
             else
-
               if patch -R -p1 -s -f --dry-run < "$WILD_KERNEL_PATCHES/common/droidspaces/fix_sysvipc_kabi_6_7_8.patch" >/dev/null 2>&1; then
                 echo "[INFO] Patch already applied. Skipping."
               else
                 patch -p1 --forward < "$WILD_KERNEL_PATCHES/common/droidspaces/fix_sysvipc_kabi_6_7_8.patch"
               fi
-
             fi
             ;;
           los/sm8550)
@@ -833,7 +849,7 @@ runs:
           --enable CONFIG_IP_SET_HASH_NETIFACE \
           --enable CONFIG_IP_SET_LIST_SET
 
-        echo "IP  SET support added ✅"
+        echo "IP SET support added ✅"
         echo "::endgroup::"
 
     - name: Add Build based configs
@@ -874,6 +890,11 @@ runs:
         set -euo pipefail
         echo "::group::Applying Kernel Branding..."
         cd "$COMMON"
+        
+        # Clean -dirty flags across trees before branding
+        sed -i 's/ -dirty//g' scripts/setlocalversion || true
+        sed -i 's/ -dirty//g' "$KERNEL_PLATFORM/msm-kernel/scripts/setlocalversion" || true
+
         if [ -n "$INPUT_UNAME" ]; then
           CUSTOM_LOCALVERSION="-${ANDROID_RELEASE}-${{ inputs.kernel_uname }}"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
@@ -897,6 +918,10 @@ runs:
 
         # Ensure Python warnings are suppressed for scripts invoked by make
         export PYTHONWARNINGS="${PYTHONWARNINGS}"
+
+        # Clean -dirty flags directly before compilation starts
+        sed -i 's/ -dirty//g' scripts/setlocalversion || true
+        sed -i 's/ -dirty//g' "$KERNEL_PLATFORM/msm-kernel/scripts/setlocalversion" || true
 
         if [ -d "$KERNEL_PLATFORM/build/build-tools/path" ]; then
           export PATH="$KERNEL_PLATFORM/build/build-tools/path/linux-x86:$PATH"
@@ -942,7 +967,6 @@ runs:
 
         if [[ "$BUILD_TYPE" == "Monolithic Build" ]]; then
           # Merge defconfig fragments
-
           if [ -f "arch/arm64/configs/vendor/${SOC}_GKI.config" ]; then
             CONFIGS+=("vendor/${SOC}_GKI.config")
           fi
@@ -979,12 +1003,11 @@ runs:
         make "${MAKE_FLAGS[@]}" O="$OUT" olddefconfig
 
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
-          make -j$(nproc --all) "${MAKE_FLAGS[@]}"  O="$OUT" Image modules
+          make -j$(nproc --all) "${MAKE_FLAGS[@]}" O="$OUT" Image modules
           make -j$(nproc --all) "${MAKE_FLAGS[@]}" O="$OUT" INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH="$INSTALL_MOD_PATH" modules_install
         else
-          make -j$(nproc --all) "${MAKE_FLAGS[@]}"  O="$OUT" Image
+          make -j$(nproc --all) "${MAKE_FLAGS[@]}" O="$OUT" Image modules || make -j$(nproc --all) "${MAKE_FLAGS[@]}" O="$OUT" Image
         fi
-        
 
         echo "duration=$SECONDS" >> "$GITHUB_ENV"
 
@@ -1094,6 +1117,11 @@ runs:
 
         # Put Image into AnyKernel3
         cp "$IMAGE_PATH" "$GITHUB_WORKSPACE/AnyKernel3/Image"
+
+        # Copy any generated loadable modules into AnyKernel3 vendor folder
+        mkdir -p "$GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules"
+        find "$COMMON/out" -name "*.ko" -exec cp {} "$GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules/" \; || true
+        
         cd "$GITHUB_WORKSPACE/AnyKernel3"
 
         if [ "${{ inputs.use_susfs }}" = "true" ]; then
@@ -1105,10 +1133,9 @@ runs:
         echo "Creating flashable zip: $ZIP_NAME"
         ( cd "$GITHUB_WORKSPACE/AnyKernel3" && zip -r "$ARTIFACTS_DIR/$ZIP_NAME" ./* >/dev/null )
 
-        # Keep only the flashable zip and the model metadata file (assumed already created earlier)
+        # Keep only the flashable zip and the model metadata file
         find "$ARTIFACTS_DIR" -maxdepth 1 -type f ! -name "$ZIP_NAME" ! -name "${MODEL}.txt" -delete
 
-        # Output for later steps (optional)
         echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
 
         echo "AnyKernel3 zip created ✅"
@@ -1176,20 +1203,15 @@ runs:
           export PATH="$KERNEL_PLATFORM/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
         fi
 
-        # Don't create DLKM_STAGING_DIR and copy the OUT/lib folder cause it has many unnecessary files
-        # Instead create lib and copy modules folder from OUT/lib/modules to DLKM_STAGING_DIR/lib/
         mkdir -p "$DLKM_STAGING_DIR/lib"
         
-        # copy modules and other files generated by depmod to staging dir
         cp -a "$OUT/lib/modules" "$DLKM_STAGING_DIR/lib/"
         cp "$DLKM_STAGING_ROOT/modules.order" "$DLKM_STAGING_ROOT/modules.load"
         cp "$DLKM_STAGING_ROOT/modules.load" "$OUT/system_dlkm.modules.load"
 
-        # remove unnecessary files from DLKM_STAGING_ROOT
         cd "$DLKM_STAGING_ROOT"
         rm build source modules.builtin.modinfo
 
-        # add other files found in stock system_dlkm
         cd "$DLKM_STAGING_DIR"
         mkdir -p etc
         cd etc
@@ -1197,7 +1219,6 @@ runs:
         touch fs_config_dirs fs_config_files
 
         cd "$OUT"
-        # Create temporary prop file for system_dlkm image
         system_dlkm_props_file="$(mktemp)"
         echo -e "system_dlkm_fs_type=ext4\n" >> ${system_dlkm_props_file}
         echo -e "use_dynamic_partition_size=true\n" >> ${system_dlkm_props_file}
@@ -1271,7 +1292,6 @@ runs:
         echo "[DEBUG] Uploading ccache logs"
         cp "$CCACHE_LOGFILE" "$ARTIFACTS_DIR_DEBUG"
 
-        # Evict untouched ccache contents
         ccache_end=$(date +%s)
         ccache_delta=$(( ccache_end - ccache_start ))
         if [[ "${{ inputs.evict_unused_ccache }}" == "true" ]]; then
