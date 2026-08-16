@@ -250,6 +250,11 @@ jobs:
           kernel_uname: ${{ inputs.kernel_uname }}
           compile_dlkm: ${{ inputs.compile_dlkm }}
 
+      - name: Fix LineageOS Missing Kconfig Error
+        run: |
+          echo "Removing proprietary kernelFwUpdate references from Kconfig..."
+          find . -name "Kconfig" -path "*/drivers/base/Kconfig" -exec sed -i '/kernelFwUpdate/d' {} + || true
+
       - name: Build Kernel Modules
         id: build_modules
         if: contains(fromJSON('["Modules Only", "Mixed Build", "Monolithic Build"]'), inputs.build_target)
