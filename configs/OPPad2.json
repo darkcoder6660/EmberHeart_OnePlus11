@@ -1,17 +1,10 @@
 {
   "model": "OPPad2",
   "soc": "pineapple",
-  "branch": "oneplus/sm8650",
-  "boot_partition_size": "201326592",
-  "vendor_boot_partition_size": "201326592",
-  "qcacld_dev_name": "kiwi_v2",
-  "clang": "manifest",
-  "manifest_oos14": "oneplus_pad2_u.xml",
-  "manifest_oos15": "oneplus_pad2_v.xml",
-  "manifest_oos16": "oneplus_pad2_b.xml",
-  "manifest_oos16_custom": "https://raw.githubusercontent.com/darkcoder6660/kernel_patches/refs/heads/main/kernel_manifest/oneplus_pad2_b.xml",
-  "android_version": "android16",
+  "branch": "sixteen-qpr2",
+  "manifest_oos16": "https://raw.githubusercontent.com/darkcoder6660/EmberHeart_OnePlus11/main/lineage_pad2.xml",
+  "manifest_oos16_modules": "https://raw.githubusercontent.com/darkcoder6660/EmberHeart_OnePlus11/main/lineage_pad2.xml",
+  "android_version": "android14",
   "kernel_version": "6.1",
   "hmbird": false
 }
-
