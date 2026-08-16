@@ -253,11 +253,13 @@ jobs:
       - name: Fix LineageOS Missing Kconfig Error
         run: |
           echo "Creating dummy Kconfig to bypass missing proprietary folders..."
-          mkdir -p ${{ matrix.model }}/kernel_platform/msm-kernel/drivers/base/kernelFwUpdate
-          echo "# Dummy file" > ${{ matrix.model }}/kernel_platform/msm-kernel/drivers/base/kernelFwUpdate/Kconfig
+          rm -rf kernel_platform/msm-kernel/drivers/base/kernelFwUpdate
+          mkdir -p kernel_platform/msm-kernel/drivers/base/kernelFwUpdate
+          echo "# Dummy file" > kernel_platform/msm-kernel/drivers/base/kernelFwUpdate/Kconfig
           
-          mkdir -p ${{ matrix.model }}/kernel_platform/common/drivers/base/kernelFwUpdate
-          echo "# Dummy file" > ${{ matrix.model }}/kernel_platform/common/drivers/base/kernelFwUpdate/Kconfig
+          rm -rf kernel_platform/common/drivers/base/kernelFwUpdate
+          mkdir -p kernel_platform/common/drivers/base/kernelFwUpdate
+          echo "# Dummy file" > kernel_platform/common/drivers/base/kernelFwUpdate/Kconfig
 
       - name: Build Kernel Modules
         id: build_modules
