@@ -4,6 +4,8 @@
   "branch": "sixteen-qpr2",
   "manifest_oos16": "https://raw.githubusercontent.com/darkcoder6660/EmberHeart_OnePlus11/main/lineage_pad2.xml",
   "manifest_oos16_modules": "https://raw.githubusercontent.com/darkcoder6660/EmberHeart_OnePlus11/main/lineage_pad2.xml",
+  "manifest_oos16_custom": "https://raw.githubusercontent.com/darkcoder6660/EmberHeart_OnePlus11/main/lineage_pad2.xml",
+  "manifest_oos16_custom_modules": "https://raw.githubusercontent.com/darkcoder6660/EmberHeart_OnePlus11/main/lineage_pad2.xml",
   "android_version": "android14",
   "kernel_version": "6.1",
   "hmbird": false
