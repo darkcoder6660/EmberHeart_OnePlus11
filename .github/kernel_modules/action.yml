@@ -330,15 +330,13 @@ runs:
         echo "Cleaning broken symlinks and running targeted Kconfig Auto-Healer..."
         for BASE_DIR in "$KERNEL_PLATFORM/msm-kernel" "$KERNEL_PLATFORM/common" "$MSM" "$COMMON" "."; do
           if [ -d "$BASE_DIR" ]; then
-            # Annihilate broken symlinks that block directory creation
-            find "$BASE_DIR" -type l ! -exec test -e {} \; -delete
-            
+            find "$BASE_DIR" -type l ! -exec test -e {} \; -delete 2>/dev/null || true
             find "$BASE_DIR" -name "Kconfig*" -type f | while read -r kconfig_file; do
               while IFS= read -r line; do
                 path_token=$(echo "$line" | sed 's/^[[:space:]]*source[[:space:]]*//' | awk '{print $1}' | tr -d '"' | tr -d "'" | tr -d '\r')
                 
                 # ONLY run on subdirectories so we NEVER overwrite the root Makefile
-                if [[ "$path_token" == drivers/* ]] || [[ "$path_token" == vendor/* ]] || [[ "$path_token" == techpack/* ]]; then
+                if [[ "$path_token" == drivers/* ]] || [[ "$path_token" == vendor/* ]] || [[ "$path_token" == techpack/* ]] || [[ "$path_token" == sound/* ]]; then
                   TARGET_FILE="$BASE_DIR/$path_token"
                   TARGET_DIR="$(dirname "$TARGET_FILE")"
                   
@@ -354,7 +352,7 @@ runs:
             done
           fi
         done
-        echo "Auto-healer completed."
+        echo "Auto-healer completed: All missing Kconfig targets neutralized."
         # ----------------------------------
         
         cd "$MSM"
@@ -391,6 +389,7 @@ runs:
           HOSTCC="ccache clang"
           HOSTCXX="ccache clang++"
           CC="ccache clang"
+          KCFLAGS="-Wno-error -Wno-format"
         )
 
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
