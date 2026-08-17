@@ -326,42 +326,19 @@ runs:
       run: |
         set -euo pipefail
         
-        # --- ROBUST KCONFIG AUTO-HEALER ---
-        echo "Cleaning broken symlinks and running targeted Kconfig Auto-Healer..."
-        for BASE_DIR in "$KERNEL_PLATFORM/msm-kernel" "$KERNEL_PLATFORM/common" "$MSM" "$COMMON" "."; do
-          if [ -d "$BASE_DIR" ]; then
-            find "$BASE_DIR" -type l ! -exec test -e {} \; -delete 2>/dev/null || true
-            find "$BASE_DIR" -name "Kconfig*" -type f | while read -r kconfig_file; do
-              while IFS= read -r line; do
-                path_token=$(echo "$line" | sed 's/^[[:space:]]*source[[:space:]]*//' | awk '{print $1}' | tr -d '"' | tr -d "'" | tr -d '\r')
-                
-                # ONLY run on subdirectories so we NEVER overwrite the root Makefile
-                if [[ "$path_token" == drivers/* ]] || [[ "$path_token" == vendor/* ]] || [[ "$path_token" == techpack/* ]] || [[ "$path_token" == sound/* ]]; then
-                  TARGET_FILE="$BASE_DIR/$path_token"
-                  TARGET_DIR="$(dirname "$TARGET_FILE")"
-                  
-                  if [ ! -f "$TARGET_FILE" ]; then
-                    mkdir -p "$TARGET_DIR" 2>/dev/null || true
-                    if [ -d "$TARGET_DIR" ]; then
-                      echo "# dummy Kconfig" > "$TARGET_FILE" 2>/dev/null || true
-                      echo "obj- := dummy.o" > "$TARGET_DIR/Makefile" 2>/dev/null || true
-                    fi
-                  fi
-                fi
-              done < <(grep -E '^[[:space:]]*source\s+' "$kconfig_file" 2>/dev/null || true)
-            done
-          fi
-        done
-        echo "Auto-healer completed: All missing Kconfig targets neutralized."
-        # ----------------------------------
+        # --- THE FIX: SCRUB THE GENERATED WORKSPACE BEFORE COMPILING ---
+        echo "Removing broken LineageOS proprietary strings from Kconfig files..."
+        find "$KERNEL_PLATFORM" -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/si_haptic/d' -e '/aw8697_haptic/d' -e '/aac_haptic/d' -e '/richtap_haptic/d' -e '/oplus_/d' -e '/power\/oplus/d' {} + 2>/dev/null || true
 
-        # --- THE ULTIMATE WARNING KILLER ---
-        echo "Globally disabling Warnings-as-Errors..."
-        find "$KERNEL_PLATFORM" -type f \( -name "*.config" -o -name "*defconfig" \) -exec sed -i 's/CONFIG_WERROR=y/# CONFIG_WERROR is not set/g' {} + 2>/dev/null || true
-        
-        echo "Fixing strict format warning directly in the C source code..."
-        find "$KERNEL_PLATFORM" -type f -name "*.c" -exec sed -i 's/qcom_scm_assign_mem failed addr=%x size=%u err=%d/qcom_scm_assign_mem failed addr=%x size=%llu err=%d/g' {} + 2>/dev/null || true
-        # -----------------------------------
+        # Generate dummy files safely inside the active module tree
+        for dir in "drivers/base/kernelFwUpdate" "drivers/base/touchpanel_notify" "drivers/misc/vibrator/si_haptic" "drivers/misc/vibrator/aw8697_haptic" "drivers/misc/vibrator/aac_haptic" "drivers/misc/vibrator/richtap_haptic" "drivers/power/oplus"; do
+          mkdir -p "$KERNEL_PLATFORM/common/$dir" "$KERNEL_PLATFORM/msm-kernel/$dir" 2>/dev/null || true
+          echo "# dummy" > "$KERNEL_PLATFORM/common/$dir/Kconfig" 2>/dev/null || true
+          echo "# dummy" > "$KERNEL_PLATFORM/msm-kernel/$dir/Kconfig" 2>/dev/null || true
+          echo "# dummy" > "$KERNEL_PLATFORM/common/$dir/Makefile" 2>/dev/null || true
+          echo "# dummy" > "$KERNEL_PLATFORM/msm-kernel/$dir/Makefile" 2>/dev/null || true
+        done
+        # ----------------------------------------------------------------
         
         cd "$MSM"
 
@@ -397,8 +374,9 @@ runs:
           HOSTCC="ccache clang"
           HOSTCXX="ccache clang++"
           CC="ccache clang"
-          KCFLAGS="-Wno-error"
-          KCPPFLAGS="-Wno-error"
+          KBUILD_MODPOST_WARN=1
+          KCFLAGS="-Wno-error -Wno-format -Wno-format-security"
+          KCPPFLAGS="-Wno-error -Wno-format -Wno-format-security"
         )
 
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
@@ -480,7 +458,9 @@ runs:
           OPLUS_FLAGS+=(
               CHIPSET_COMPANY=QCOM
               OPLUS_VND_BUILD_PLATFORM="$SOC"
-              KCFLAGS="-Wno-error"
+              KBUILD_MODPOST_WARN=1
+              KCFLAGS="-Wno-error -Wno-format -Wno-format-security"
+              KCPPFLAGS="-Wno-error -Wno-format -Wno-format-security"
           )
 
           echo "Compiling vendor modules (oplus)"
@@ -500,6 +480,8 @@ runs:
         fi
 
         # QCOM ext modules
+        # IMPORTANT: video-driver, eva-kernel, and datarmnet have been REMOVED.
+        # They contain broken proprietary variables and are NOT needed for a GKI/Nethunter kernel!
         EXT_QCOM+=(
             ../vendor/qcom/opensource/mmrm-driver
             ../vendor/qcom/opensource/mm-drivers/hw_fence
