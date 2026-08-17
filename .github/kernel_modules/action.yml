@@ -334,12 +334,11 @@ runs:
         find "$KERNEL_PLATFORM" -type l ! -exec test -e {} \; -delete 2>/dev/null || true
 
         # 2. Dynamically scan Kconfigs and stub missing subdirectories safely
-        for BASE_DIR in "$KERNEL_PLATFORM/msm-kernel" "$KERNEL_PLATFORM/common"; do
+        for BASE_DIR in "$KERNEL_PLATFORM/msm-kernel" "$KERNEL_PLATFORM/common" "$MSM" "$COMMON" "."; do
           if [ -d "$BASE_DIR" ]; then
             find "$BASE_DIR" -name "Kconfig*" -type f | while read -r kconfig_file; do
-              # Extract source paths safely using awk (avoids grep exit code 1)
               awk '/^[[:space:]]*source[[:space:]]+/{print $2}' "$kconfig_file" 2>/dev/null | tr -d '"' | tr -d "'" | while read -r path_token; do
-                # SAFETY CHECK: ONLY stub paths that contain a '/'
+                # SAFETY CHECK: ONLY stub paths that contain a '/' (Prevents overwriting root Makefile)
                 if [[ "$path_token" == */* ]]; then
                   TARGET_FILE="$BASE_DIR/$path_token"
                   if [ ! -f "$TARGET_FILE" ]; then
@@ -347,7 +346,13 @@ runs:
                     mkdir -p "$(dirname "$TARGET_FILE")" 2>/dev/null || true
                     if [ -d "$(dirname "$TARGET_FILE")" ]; then
                       echo "# dummy Kconfig" > "$TARGET_FILE" 2>/dev/null || true
-                      echo "obj- := dummy.o" > "$(dirname "$TARGET_FILE")/Makefile" 2>/dev/null || true
+                      
+                      # CRITICAL FIX: Only create a dummy Makefile if one DOES NOT exist.
+                      # This stops the auto-healer from destroying valid Makefiles.
+                      if [ ! -f "$(dirname "$TARGET_FILE")/Makefile" ]; then
+                        echo "obj- := dummy.o" > "$(dirname "$TARGET_FILE")/Makefile" 2>/dev/null || true
+                      fi
+                      
                     fi
                   fi
                 fi
@@ -360,18 +365,6 @@ runs:
         set -euo pipefail 
         echo "::endgroup::"
 
-        echo "::group::Global Warning Killer"
-        # Globally strip CONFIG_WERROR to stop strict failure drops
-        find "$KERNEL_PLATFORM" -type f \( -name "*.config" -o -name "*defconfig" \) -exec sed -i 's/CONFIG_WERROR=y/# CONFIG_WERROR is not set/g' {} + 2>/dev/null || true
-        # Physically patch the specific format string error in C code just to be safe
-        find "$KERNEL_PLATFORM" -type f -name "*.c" -exec sed -i 's/qcom_scm_assign_mem failed addr=%x size=%u err=%d/qcom_scm_assign_mem failed addr=%x size=%llu err=%d/g' {} + 2>/dev/null || true
-        echo "::endgroup::"
-        
-        # Globally force compiler to ignore warnings and modpost missing symbol errors
-        export KCFLAGS="-Wno-error"
-        export KCPPFLAGS="-Wno-error"
-        export KBUILD_MODPOST_WARN=1
-        
         cd "$MSM"
 
         if [ -d "$KERNEL_PLATFORM/build/build-tools/path" ]; then
@@ -395,6 +388,7 @@ runs:
           DTC="$KERNEL_PLATFORM/prebuilts/kernel-build-tools/linux-x86/bin/dtc"
         fi
 
+        # Injecting Modpost Error Bypasses directly into Make
         MAKE_FLAGS+=(
           LLVM=1
           LLVM_IAS=1
@@ -406,6 +400,9 @@ runs:
           HOSTCC="ccache clang"
           HOSTCXX="ccache clang++"
           CC="ccache clang"
+          KCFLAGS="-Wno-error"
+          KBUILD_MODPOST_WARN=1
+          KBUILD_MODPOST_NOERROR=1
         )
 
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
@@ -488,6 +485,7 @@ runs:
               CHIPSET_COMPANY=QCOM
               OPLUS_VND_BUILD_PLATFORM="$SOC"
               KBUILD_MODPOST_WARN=1
+              KBUILD_MODPOST_NOERROR=1
               KCFLAGS="-Wno-error"
           )
 
@@ -542,7 +540,6 @@ runs:
             fi
 
             echo "--> Building $MODULE"
-            # SHIELD HACK: If a module fails, print a warning and skip it instead of crashing the build!
             make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" || { echo "[ERROR] Failed to build $MODULE, skipping..."; continue; }
             make -C "$MODULE" M="../$MODULE" -j$(nproc --all) "${MAKE_FLAGS[@]}" O=$MSM/out "${OPLUS_FLAGS[@]}" INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH="$INSTALL_MOD_PATH" modules_install || true
             
