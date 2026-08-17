@@ -214,35 +214,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: The Invincible Make Hijacker (Bypasses Git Clean)
-        run: |
-          echo "Building compiler interceptor OUTSIDE the git workspace so it cannot be deleted..."
-          mkdir -p /tmp/make_hijack
-          cat << 'EOF' > /tmp/make_hijack/make
-          #!/bin/bash
-          # Intercept the make command right as it's executed
-          if [ -d "kernel_platform" ]; then T_DIR="kernel_platform"; elif [ -d "msm-kernel" ]; then T_DIR="."; else T_DIR=""; fi
-          
-          if [ -n "$T_DIR" ]; then
-            # Obliterate all LineageOS proprietary strings directly from the files
-            find "$T_DIR" -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/si_haptic/d' -e '/aw8697_haptic/d' -e '/aac_haptic/d' -e '/richtap_haptic/d' -e '/oplus_/d' {} + 2>/dev/null || true
-            
-            # Create dummy files so the parser has something valid to read
-            for dir in "drivers/base/kernelFwUpdate" "drivers/base/touchpanel_notify" "drivers/misc/vibrator/si_haptic" "drivers/misc/vibrator/aw8697_haptic" "drivers/misc/vibrator/aac_haptic" "drivers/misc/vibrator/richtap_haptic"; do
-              mkdir -p "$T_DIR/common/$dir" "$T_DIR/msm-kernel/$dir" 2>/dev/null || true
-              echo "# dummy" > "$T_DIR/common/$dir/Kconfig" 2>/dev/null || true
-              echo "# dummy" > "$T_DIR/msm-kernel/$dir/Kconfig" 2>/dev/null || true
-              echo "# dummy" > "$T_DIR/common/$dir/Makefile" 2>/dev/null || true
-              echo "# dummy" > "$T_DIR/msm-kernel/$dir/Makefile" 2>/dev/null || true
-            done
-          fi
-          
-          # Pass execution back to the real system Make compiler
-          exec /usr/bin/make "$@"
-          EOF
-          chmod +x /tmp/make_hijack/make
-          echo "/tmp/make_hijack" >> $GITHUB_PATH
-
       - name: Patch env_setup to bypass missing Clang checks
         run: |
           echo "Patching env_setup action to prevent Clang errors..."
