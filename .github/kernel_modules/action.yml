@@ -327,6 +327,9 @@ runs:
         set -euo pipefail
         
         echo "::group::Universal Safe Kconfig Auto-Healer"
+        # Temporarily disable pipefail and exit-on-error so empty searches don't crash the script
+        set +euo pipefail 
+        
         # 1. Destroy broken symlinks that block directory creation
         find "$KERNEL_PLATFORM" -type l ! -exec test -e {} \; -delete 2>/dev/null || true
 
@@ -334,9 +337,9 @@ runs:
         for BASE_DIR in "$KERNEL_PLATFORM/msm-kernel" "$KERNEL_PLATFORM/common"; do
           if [ -d "$BASE_DIR" ]; then
             find "$BASE_DIR" -name "Kconfig*" -type f | while read -r kconfig_file; do
-              # Extract source paths safely without throwing errors
-              grep -E '^[[:space:]]*source\s+' "$kconfig_file" 2>/dev/null | awk '{print $2}' | tr -d '"' | tr -d "'" | while read -r path_token; do
-                # SAFETY CHECK: ONLY stub paths that contain a '/' (This completely prevents corrupting the root Makefile)
+              # Extract source paths safely using awk (avoids grep exit code 1)
+              awk '/^[[:space:]]*source[[:space:]]+/{print $2}' "$kconfig_file" 2>/dev/null | tr -d '"' | tr -d "'" | while read -r path_token; do
+                # SAFETY CHECK: ONLY stub paths that contain a '/'
                 if [[ "$path_token" == */* ]]; then
                   TARGET_FILE="$BASE_DIR/$path_token"
                   if [ ! -f "$TARGET_FILE" ]; then
@@ -352,6 +355,9 @@ runs:
             done
           fi
         done
+        
+        # Re-enable strict error handling
+        set -euo pipefail 
         echo "::endgroup::"
 
         echo "::group::Global Warning Killer"
