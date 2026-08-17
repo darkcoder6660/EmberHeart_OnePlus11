@@ -325,22 +325,30 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        
-        # --- THE FIX: SCRUB THE GENERATED WORKSPACE BEFORE COMPILING ---
-        echo "Removing broken LineageOS proprietary strings from Kconfig files..."
-        find "$KERNEL_PLATFORM" -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/si_haptic/d' -e '/aw8697_haptic/d' -e '/aac_haptic/d' -e '/richtap_haptic/d' -e '/power\/oplus/d' {} + 2>/dev/null || true
 
-        # Generate dummy files safely inside the active module tree
-        for dir in "drivers/base/kernelFwUpdate" "drivers/base/touchpanel_notify" "drivers/misc/vibrator/si_haptic" "drivers/misc/vibrator/aw8697_haptic" "drivers/misc/vibrator/aac_haptic" "drivers/misc/vibrator/richtap_haptic" "drivers/power/oplus"; do
-          mkdir -p "$KERNEL_PLATFORM/common/$dir" "$KERNEL_PLATFORM/msm-kernel/$dir" 2>/dev/null || true
-          echo "# dummy" > "$KERNEL_PLATFORM/common/$dir/Kconfig" 2>/dev/null || true
-          echo "# dummy" > "$KERNEL_PLATFORM/msm-kernel/$dir/Kconfig" 2>/dev/null || true
-          echo "# dummy" > "$KERNEL_PLATFORM/common/$dir/Makefile" 2>/dev/null || true
-          echo "# dummy" > "$KERNEL_PLATFORM/msm-kernel/$dir/Makefile" 2>/dev/null || true
-        done
-        # ----------------------------------------------------------------
-        
         cd "$MSM"
+
+        # --- THE FIX: AUTO-STUB ANY MISSING KCONFIG SOURCE TARGETS ---
+        # Instead of hardcoding driver names (whack-a-mole), scan every
+        # Kconfig in the tree for `source "..."` lines and, if the target
+        # file doesn't actually exist (OEM-proprietary trees stripped out
+        # of the public msm-kernel repo), generate an empty stub for it so
+        # the config parser doesn't die. Runs relative to $MSM, which is
+        # known-good since every other step in this file cd's there.
+        echo "::group::Auto-stubbing missing Kconfig sources"
+        find . -name 'Kconfig*' -print0 2>/dev/null \
+          | xargs -0 grep -hoP '^\s*source\s+"\K[^"$]+(?=")' 2>/dev/null \
+          | sort -u \
+          | while read -r src; do
+              [ -z "$src" ] && continue
+              if [ ! -f "$src" ]; then
+                echo "Stubbing missing Kconfig: $src"
+                mkdir -p "$(dirname "$src")"
+                printf '# auto-stub (missing OEM tree, removed for NetHunter build)\n' > "$src"
+              fi
+            done
+        echo "::endgroup::"
+        # ----------------------------------------------------------------
 
         if [ -d "$KERNEL_PLATFORM/build/build-tools/path" ]; then
           export PATH="$KERNEL_PLATFORM/build/build-tools/path/linux-x86:$PATH"
