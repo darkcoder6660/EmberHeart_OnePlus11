@@ -325,6 +325,21 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        
+        # --- THE FIX: SCRUB THE GENERATED WORKSPACE BEFORE COMPILING ---
+        echo "Removing broken LineageOS proprietary strings from Kconfig files..."
+        find "$KERNEL_PLATFORM" -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/si_haptic/d' -e '/aw8697_haptic/d' -e '/aac_haptic/d' -e '/richtap_haptic/d' -e '/oplus_/d' {} + 2>/dev/null || true
+
+        # Generate dummy files safely inside the active module tree
+        for dir in "drivers/base/kernelFwUpdate" "drivers/base/touchpanel_notify" "drivers/misc/vibrator/si_haptic" "drivers/misc/vibrator/aw8697_haptic" "drivers/misc/vibrator/aac_haptic" "drivers/misc/vibrator/richtap_haptic"; do
+          mkdir -p "$KERNEL_PLATFORM/common/$dir" "$KERNEL_PLATFORM/msm-kernel/$dir" 2>/dev/null || true
+          echo "# dummy" > "$KERNEL_PLATFORM/common/$dir/Kconfig" 2>/dev/null || true
+          echo "# dummy" > "$KERNEL_PLATFORM/msm-kernel/$dir/Kconfig" 2>/dev/null || true
+          echo "# dummy" > "$KERNEL_PLATFORM/common/$dir/Makefile" 2>/dev/null || true
+          echo "# dummy" > "$KERNEL_PLATFORM/msm-kernel/$dir/Makefile" 2>/dev/null || true
+        done
+        # ----------------------------------------------------------------
+        
         cd "$MSM"
 
         if [ -d "$KERNEL_PLATFORM/build/build-tools/path" ]; then
