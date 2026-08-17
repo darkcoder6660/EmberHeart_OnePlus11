@@ -214,6 +214,34 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Hijack Make Compiler (The Invincible Fix)
+        run: |
+          echo "Creating compiler interceptor to destroy LineageOS errors on the fly..."
+          mkdir -p $GITHUB_WORKSPACE/bin
+          cat << 'EOF' > $GITHUB_WORKSPACE/bin/make
+          #!/bin/bash
+          # Only run the scrubber once per top-level make command to prevent recursive slowdowns
+          if [ -z "$KCONFIG_SCRUBBED" ]; then
+            export KCONFIG_SCRUBBED=1
+            echo "=> [Make Hijacker] Intercepting compiler to eradicate LineageOS errors..."
+            if [ -d "kernel_platform" ]; then T_DIR="kernel_platform"; elif [ -d "msm-kernel" ]; then T_DIR="."; else T_DIR=""; fi
+            if [ -n "$T_DIR" ]; then
+              find "$T_DIR" -type f \( -name "Kconfig*" -o -name "Makefile*" \) -exec sed -i -e '/kernelFwUpdate/d' -e '/touchpanel_notify/d' -e '/si_haptic/d' -e '/aw8697_haptic/d' -e '/aac_haptic/d' -e '/richtap_haptic/d' -e '/oplus/d' {} + 2>/dev/null || true
+              for dir in "drivers/base/kernelFwUpdate" "drivers/base/touchpanel_notify" "drivers/misc/vibrator/si_haptic" "drivers/misc/vibrator/aw8697_haptic" "drivers/misc/vibrator/aac_haptic" "drivers/misc/vibrator/richtap_haptic"; do
+                mkdir -p "$T_DIR/msm-kernel/$dir" "$T_DIR/common/$dir" 2>/dev/null || true
+                echo "# dummy" > "$T_DIR/msm-kernel/$dir/Kconfig" 2>/dev/null || true
+                echo "# dummy" > "$T_DIR/common/$dir/Kconfig" 2>/dev/null || true
+                echo "# dummy" > "$T_DIR/msm-kernel/$dir/Makefile" 2>/dev/null || true
+                echo "# dummy" > "$T_DIR/common/$dir/Makefile" 2>/dev/null || true
+              done
+            fi
+          fi
+          # Execute the REAL make command
+          exec /usr/bin/make "$@"
+          EOF
+          chmod +x $GITHUB_WORKSPACE/bin/make
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
       - name: Patch env_setup to bypass missing Clang checks
         run: |
           echo "Patching env_setup action to prevent Clang errors..."
