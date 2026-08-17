@@ -326,27 +326,36 @@ runs:
       run: |
         set -euo pipefail
         
-        # --- UNIVERSAL KCONFIG AUTO-HEALER ---
-        echo "Running Universal Kconfig Auto-Healer to eliminate all upcoming missing file errors..."
-        for BASE_DIR in "." "$MSM" "$COMMON" "$KERNEL_PLATFORM/msm-kernel" "$KERNEL_PLATFORM/common"; do
+        # --- ROBUST KCONFIG AUTO-HEALER ---
+        echo "Cleaning broken symlinks and running targeted Kconfig Auto-Healer..."
+        for BASE_DIR in "$KERNEL_PLATFORM/msm-kernel" "$KERNEL_PLATFORM/common" "$MSM" "$COMMON" "."; do
           if [ -d "$BASE_DIR" ]; then
+            # Annihilate broken symlinks that block directory creation
+            find "$BASE_DIR" -type l ! -exec test -e {} \; -delete
+            
             find "$BASE_DIR" -name "Kconfig*" -type f | while read -r kconfig_file; do
               while IFS= read -r line; do
                 path_token=$(echo "$line" | sed 's/^[[:space:]]*source[[:space:]]*//' | awk '{print $1}' | tr -d '"' | tr -d "'" | tr -d '\r')
-                if [[ -n "$path_token" && "$path_token" != \#* ]]; then
+                
+                # ONLY run on subdirectories so we NEVER overwrite the root Makefile
+                if [[ "$path_token" == drivers/* ]] || [[ "$path_token" == vendor/* ]] || [[ "$path_token" == techpack/* ]]; then
                   TARGET_FILE="$BASE_DIR/$path_token"
+                  TARGET_DIR="$(dirname "$TARGET_FILE")"
+                  
                   if [ ! -f "$TARGET_FILE" ]; then
-                    mkdir -p "$(dirname "$TARGET_FILE")" 2>/dev/null || true
-                    echo "# Auto-generated dummy Kconfig" > "$TARGET_FILE" 2>/dev/null || true
-                    echo "obj- := dummy.o" > "$(dirname "$TARGET_FILE")/Makefile" 2>/dev/null || true
+                    mkdir -p "$TARGET_DIR" 2>/dev/null || true
+                    if [ -d "$TARGET_DIR" ]; then
+                      echo "# dummy Kconfig" > "$TARGET_FILE" 2>/dev/null || true
+                      echo "obj- := dummy.o" > "$TARGET_DIR/Makefile" 2>/dev/null || true
+                    fi
                   fi
                 fi
               done < <(grep -E '^[[:space:]]*source\s+' "$kconfig_file" 2>/dev/null || true)
             done
           fi
         done
-        echo "Auto-healer completed: All missing Kconfig targets neutralized."
-        # ----------------------------------------------------------------
+        echo "Auto-healer completed."
+        # ----------------------------------
         
         cd "$MSM"
 
