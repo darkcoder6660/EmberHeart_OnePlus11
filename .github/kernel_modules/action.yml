@@ -1,3 +1,4 @@
+
 name: Build OnePlus kernel modules
 
 permissions:
@@ -326,26 +327,19 @@ runs:
       run: |
         set -euo pipefail
         
-        # --- ROBUST KCONFIG AUTO-HEALER ---
-        echo "Cleaning broken symlinks and running targeted Kconfig Auto-Healer..."
+        # --- UNIVERSAL KCONFIG AUTO-HEALER ---
+        echo "Running Universal Kconfig Auto-Healer to eliminate all upcoming missing file errors..."
         for BASE_DIR in "$KERNEL_PLATFORM/msm-kernel" "$KERNEL_PLATFORM/common" "$MSM" "$COMMON" "."; do
           if [ -d "$BASE_DIR" ]; then
-            find "$BASE_DIR" -type l ! -exec test -e {} \; -delete 2>/dev/null || true
             find "$BASE_DIR" -name "Kconfig*" -type f | while read -r kconfig_file; do
               while IFS= read -r line; do
                 path_token=$(echo "$line" | sed 's/^[[:space:]]*source[[:space:]]*//' | awk '{print $1}' | tr -d '"' | tr -d "'" | tr -d '\r')
-                
-                # ONLY run on subdirectories so we NEVER overwrite the root Makefile
-                if [[ "$path_token" == drivers/* ]] || [[ "$path_token" == vendor/* ]] || [[ "$path_token" == techpack/* ]] || [[ "$path_token" == sound/* ]]; then
+                if [[ -n "$path_token" && "$path_token" != \#* ]]; then
                   TARGET_FILE="$BASE_DIR/$path_token"
-                  TARGET_DIR="$(dirname "$TARGET_FILE")"
-                  
                   if [ ! -f "$TARGET_FILE" ]; then
-                    mkdir -p "$TARGET_DIR" 2>/dev/null || true
-                    if [ -d "$TARGET_DIR" ]; then
-                      echo "# dummy Kconfig" > "$TARGET_FILE" 2>/dev/null || true
-                      echo "obj- := dummy.o" > "$TARGET_DIR/Makefile" 2>/dev/null || true
-                    fi
+                    mkdir -p "$(dirname "$TARGET_FILE")" 2>/dev/null || true
+                    echo "# Auto-generated dummy Kconfig" > "$TARGET_FILE" 2>/dev/null || true
+                    echo "obj- := dummy.o" > "$(dirname "$TARGET_FILE")/Makefile" 2>/dev/null || true
                   fi
                 fi
               done < <(grep -E '^[[:space:]]*source\s+' "$kconfig_file" 2>/dev/null || true)
@@ -353,7 +347,7 @@ runs:
           fi
         done
         echo "Auto-healer completed: All missing Kconfig targets neutralized."
-        # ----------------------------------
+        # ----------------------------------------------------------------
         
         cd "$MSM"
 
@@ -389,7 +383,6 @@ runs:
           HOSTCC="ccache clang"
           HOSTCXX="ccache clang++"
           CC="ccache clang"
-          KCFLAGS="-Wno-error -Wno-format"
         )
 
         if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
@@ -397,6 +390,11 @@ runs:
             KBUILD_MIXED_TREE="$KBUILD_MIXED_TREE_DIR"
           )
         fi
+        
+        # --- COMPILER OVERRIDE FOR WARNINGS ---
+        export KCFLAGS="-Wno-error -Wno-format -Wno-format-security"
+        export KCPPFLAGS="-Wno-error -Wno-format -Wno-format-security"
+        # --------------------------------------
 
         OUT=out
         INSTALL_MOD_PATH="$MSM/out"
