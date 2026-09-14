@@ -1093,6 +1093,7 @@ runs:
         sudo mount -o loop,ro "${DIST_DIR}/system_dlkm.img" /mnt/system_dlkm
         sudo ls -RZ "/mnt/system_dlkm" | tee "${ARTIFACTS_DIR_DEBUG}/system_dlkm.fc" || true
 
+        cp "${system_dlkm_modules_load}" "${DIST_DIR}/system_dlkm.modules.load"
         tar -czf "${DIST_DIR}/system_dlkm_archive.tar.gz" -C "${SYSTEM_DLKM_STAGING_DIR}" .
 
     - name: Create vendor_boot
@@ -1379,6 +1380,7 @@ runs:
         fi
 
         echo -e "::debug:: vendor_boot staging tree :\n$(tree "${VENDOR_BOOT_STAGING_DIR}")" | tee "${DIST_DIR}/vendor_boot.tree"
+        cp "${RAMDISK_STAGING_MODULES}/modules.load" "${DIST_DIR}/vendor_boot.modules.load" 
         tar -czf "${DIST_DIR}/vendor_boot_archive.tar.gz" -C "${VENDOR_BOOT_STAGING_DIR}" .
 
     - name: Create vendor_dlkm
@@ -1703,6 +1705,7 @@ runs:
         sudo getfattr -R -h -n security.selinux -m security.selinux "/mnt/vendor_dlkm" | tee "${DIST_DIR}/vendor_dlkm.fc" || true
 
         echo -e "::debug:: vendor_dlkm staging tree :\n$(tree "${VENDOR_DLKM_STAGING_DIR}")" | tee "${DIST_DIR}/vendor_dlkm.tree"
+        cp "${vendor_dlkm_modules_load}" "${DIST_DIR}/vendor_dlkm.modules.load" 
         tar -czf "${DIST_DIR}/vendor_dlkm_archive.tar.gz" -C "${VENDOR_DLKM_STAGING_DIR}" .
 
     - name: Hash distribution artifacts
