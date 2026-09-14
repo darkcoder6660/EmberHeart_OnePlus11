@@ -1559,6 +1559,16 @@ runs:
           fi
         fi
 
+        # invert match modules.order with the modules we have included in vendor_boot and vendor_dlkm, this will be used to generate
+        # modules.load.extra by manual resolution
+        if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
+          grep -v -F -x -f "${DIST_DIR}/vendor_boot.modules.load" "${vendor_dlkm_modules_list}" "${vendor_dlkm_modules_extra}" \
+           ${modules_order} > "${DIST_DIR}/modules.kbuild.extra"
+        else
+          grep -v -F -x -f "${DIST_DIR}/vendor_boot.modules.load" "${vendor_dlkm_modules_list}" \
+           ${modules_order} > "${DIST_DIR}/modules.kbuild.extra"
+        fi
+
         # Apply depmod and copy required artifacts
         cd "${DEPMOD_DIR}"
         echo "::note:: Performing depmod"
