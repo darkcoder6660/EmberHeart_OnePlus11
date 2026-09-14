@@ -910,8 +910,6 @@ runs:
           set +a
         fi
 
-        set -x
-
         # Clean staging dir, since we cache the OUT_DIR
         mkdir -p ${SYSTEM_DLKM_STAGING_DIR}
         rm -rf ${SYSTEM_DLKM_STAGING_DIR}
@@ -1090,8 +1088,6 @@ runs:
         avbtool add_hashtree_footer "${AVBTOOL_ARGS[@]}"
         set +x
 
-        set +x
-
         echo -e "::debug:: system_dlkm fc:"
         sudo mkdir -p /mnt/system_dlkm
         sudo mount -o loop,ro "${DIST_DIR}/system_dlkm.img" /mnt/system_dlkm
@@ -1136,8 +1132,6 @@ runs:
             . ${BUILD_CONFIG}
           set +a
         fi
-
-        set -x
 
         # Clean staging dir, since we cache the OUT_DIR
         mkdir -p ${VENDOR_BOOT_STAGING_DIR}
@@ -1384,8 +1378,6 @@ runs:
           set +x
         fi
 
-        set +x
-
         echo -e "::debug:: vendor_boot staging tree :\n$(tree "${VENDOR_BOOT_STAGING_DIR}")" | tee "${DIST_DIR}/vendor_boot.tree"
         tar -czf "${DIST_DIR}/vendor_boot_archive.tar.gz" -C "${VENDOR_BOOT_STAGING_DIR}" .
 
@@ -1412,6 +1404,7 @@ runs:
         DEPMOD_MODULES_ROOT="${DEPMOD_DIR_ROOT}/vendor/lib/modules"
 
         vendor_dlkm_modules_list="${PREBUILTS}/vendor_dlkm.modules.include"
+        vendor_dlkm_modules_extra="${PREBUILTS}/vendor_dlkm.modules.load.extra"
         vendor_dlkm_modules_load="${VENDOR_DLKM_STAGING_ROOT}/modules.load"
         vendor_dlkm_modules_order="${VENDOR_DLKM_STAGING_ROOT}/modules.order"
 
@@ -1421,8 +1414,6 @@ runs:
             . ${BUILD_CONFIG}
           set +a
         fi
-
-        set -x
 
         # Clean staging dir, since we cache the OUT_DIR
         mkdir -p ${VENDOR_DLKM_STAGING_DIR}
@@ -1437,7 +1428,7 @@ runs:
         shopt -s nullglob
         for file in "${PREBUILTS}"/vendor_dlkm.modules.*; do
           prebuilt_file=$(basename "${file}")
-          if [[ "${prebuilt_file}" == "vendor_dlkm.modules.include" ]]; then
+          if [[ "${prebuilt_file}" == "vendor_dlkm.modules.include" || "${prebuilt_file}" == "vendor_dlkm.modules.load.extra" ]]; then
             continue
           fi
           cp "${file}" "${VENDOR_DLKM_STAGING_ROOT}/${prebuilt_file#vendor_dlkm.}"
@@ -1449,6 +1440,7 @@ runs:
           exit 1
         fi
 
+        # this is done so that users can just place modules.load file extracted from stock dlkm as modules.include
         if [[ ! -f "${vendor_dlkm_modules_load}" ]]; then
           cat "${vendor_dlkm_modules_list}" > "${vendor_dlkm_modules_load}"
           # optinal since vendor dlkm module list is expected to be flattened
@@ -1457,6 +1449,11 @@ runs:
 
         if [[ -f "${PREBUILTS}/system_dlkm.modules.blocklist" ]]; then
           cp "${PREBUILTS}/system_dlkm.modules.blocklist" "${VENDOR_DLKM_STAGING_ROOT}"
+        fi
+
+        # Append extra modules for auto loading
+        if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
+          cat "${vendor_dlkm_modules_extra}" >> "${vendor_dlkm_modules_load}"
         fi
 
         # copy modules to DEPMOD_MODULES_ROOT
@@ -1479,10 +1476,34 @@ runs:
         done < "${vendor_dlkm_modules_list}"
 
         if [[ -s "${missing_modules}" ]]; then
-          echo "::error:: The following ramdisk modules are missing :"
+          echo "::error:: The following vendor_dlkm modules are missing :"
           echo "$(cat "${missing_modules}")"
           echo "Stopping build!"
           exit 1
+        fi
+
+        # copy extra vendor_dlkm modules defined in prebuilt/vendor_dlkm.modules.load.extra
+        if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
+          cd "${MODULES_STAGING_ROOT}"
+          missing_modules_extra=$(mktemp)
+          while IFS= read -r module_extra || [[ -n "${module_extra}" ]]; do
+            extra_module_path=$(find . -name "${module_extra}" -print -quit)
+            if [[ -n "${extra_module_path}" ]]; then
+              cp "${extra_module_path}" "${DEPMOD_MODULES_ROOT}"
+            else
+              # these are extra modules, so cant be a proprietary one
+              echo "WARNING: ${module_extra} not found" >&2
+              echo "${module_extra}" >> "${missing_modules_extra}"
+            fi
+          done < "${vendor_dlkm_modules_extra}"
+
+          if [[ -s "${missing_modules_extra}" ]]; then
+            echo "::error:: The following vendor_dlkm modules are missing :"
+            echo "$(cat "${missing_modules_extra}")"
+            echo "hint: did you recently remove any driver/feature you added for autoloading earlier?"
+            echo "Stopping build!"
+            exit 1
+          fi
         fi
 
         # if VENDOR_DLKM_STRIP_MODULES_LOAD is set to 1, modules loaded in system_dlkm and vendor_boot will be stripped vendor_dlkm
@@ -1523,10 +1544,19 @@ runs:
         stripped_modules_order="$(mktemp)"
         grep -F -x -f "${vendor_dlkm_modules_list}" \
           ${modules_order} > "${stripped_modules_order}" || true
-        mv -f ${stripped_modules_order} ${modules_order}
+
+        if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
+          extra_modules_order="$(mktemp)"
+          grep -F -x -f "${vendor_dlkm_modules_extra}" \
+            ${modules_order} > "${extra_modules_order}" || true
+        fi
 
         if [[ "${VENDOR_DLKM_HAS_MODULES_ORDER:-0}" == "1" ]]; then
-          cat "${modules_order}" > "${vendor_dlkm_modules_order}"
+          cat "${stripped_modules_order}" > "${vendor_dlkm_modules_order}"
+
+          if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
+            cat "${extra_modules_order}" >> "${vendor_dlkm_modules_order}"
+          fi
         fi
 
         # Apply depmod and copy required artifacts
@@ -1614,7 +1644,7 @@ runs:
 
         # Extra cmds for device specific needs
         if [[ -v VENDOR_DLKM_EXTRA_CMDS ]]; then
-          echo -e "::debug::Evaluating VENDOR_DLKM_EXTRA_CMDS inside $(pwd)"
+          echo -e "::debug:: Evaluating VENDOR_DLKM_EXTRA_CMDS inside $(pwd)"
           set -x
           eval "${VENDOR_DLKM_EXTRA_CMDS}"
           set +x
@@ -1655,8 +1685,6 @@ runs:
         echo "::notice:: Adding hashtree footer using avbtool"
         set -x
         avbtool add_hashtree_footer "${AVBTOOL_ARGS[@]}"
-        set +x
-
         set +x
 
         echo -e "::debug::vendor_dlkm fc:"
