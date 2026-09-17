@@ -1,6 +1,6 @@
 # Device Build Config (`BUILD_CONFIG` / `build.config.<codename>.<os_short>`)
 
-This document covers the **other** build-config mechanism in EmberHeart: the per-device, per-OS shell file that lets you override kernel/module build behavior (defconfig selection, boot image signing, ramdisk compression, DLKM staging, etc.) without touching the composite actions themselves. This is distinct from `configs/*.json` (device metadata used to build the CI matrix) — see `docs/build_config_json.md` (or wherever the metadata doc lives) for that.
+This document covers the **other** build-config mechanism in Dragonw1nd: the per-device, per-OS shell file that lets you override kernel/module build behavior (defconfig selection, boot image signing, ramdisk compression, DLKM staging, etc.) without touching the composite actions themselves. This is distinct from `configs/*.json` (device metadata used to build the CI matrix) — see `docs/build_config_json.md` (or wherever the metadata doc lives) for that.
 
 ## 1. What it is and where it lives
 

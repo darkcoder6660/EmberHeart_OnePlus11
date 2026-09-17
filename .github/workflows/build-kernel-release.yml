@@ -1,4 +1,4 @@
-name: Build and Release EmberHeart Kernel and Kernel Modules
+name: Build and Release Dragonw1nd Kernel and Kernel Modules
 
 permissions:
   contents: write
@@ -164,7 +164,7 @@ jobs:
           echo "MATRIX_EOF" >> "${GITHUB_OUTPUT}"
 
   build:
-    name: Build ${{ matrix.product }} EmberHeart
+    name: Build ${{ matrix.product }} Dragonw1nd
     needs: set-model
     runs-on: ubuntu-latest
     outputs:

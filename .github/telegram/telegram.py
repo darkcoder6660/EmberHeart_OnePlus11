@@ -3,11 +3,11 @@
 
 Usage:
     telegram.py --product "OnePlus 11 5G" --release-type none \
-        --lto thin --optimize-level O2 --kernel-uname 6.1.87-EmberHeart \
+        --lto thin --optimize-level O2 --kernel-uname 6.1.87-dragonw1nd \
         --ksun-version v1.2.3 \
         --banner https://raw.githubusercontent.com/nullptr-t-oss/.../banner.png \
         --feat realtek --feat ath --feat can_slcan \
-        --file /path/to/EmberHeart.zip --file /path/to/boot.img \
+        --file /path/to/Dragonw1nd.zip --file /path/to/boot.img \
         --build-start 1757930400
 
 Secrets (bot token / chat id / thread id) are read from environment
@@ -44,7 +44,7 @@ RELEASE_CHIP = {
 }
 
 GITHUB_PROFILE_URL = "https://github.com/nullptr-t-oss"
-PROJECT_URL = "https://github.com/nullptr-t-oss/EmberHeart_OnePlus11"
+PROJECT_URL = "https://github.com/nullptr-t-oss/Dragonw1nd-Kernels"
 
 
 def parse_args() -> argparse.Namespace:

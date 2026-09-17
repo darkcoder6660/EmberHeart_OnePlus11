@@ -29,7 +29,6 @@
 > - [Kernel Flasher - fatalcoder524 fork](https://github.com/fatalcoder524/KernelFlasher/releases/latest)
 > - [Nethuner Wireless Firmware](https://github.com/nullptr-t-oss/Nethunter-Wireless-Firmware/releases/latest)
 > - [Guide to fix Unusually long boot times on A16 when using Nethunter](docs/a16_fix.md)
-> - [Link to Org repo maintained by @fatalcoder524](https://github.com/EmberHeart-Kernels/Dragonw1nd-Kernels)
 > - [Loading chipset drivers](docs/drivers.md)
 > - [Porting Kernel for other OnePlus devices (GKI2 - i.e. kernel 5.10 or above)](docs/porting.md)
 > - [Guide to use build config for device specific build customization](docs/BUILD_CONFIG_HOOKS.md)

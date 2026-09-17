@@ -1,4 +1,4 @@
-name: Build EmberHeart Kernel and Kernel Modules
+name: Build Dragonw1nd Kernel and Kernel Modules
 description: "Builds Kernel and Kernel modules"
 
 inputs:
@@ -75,7 +75,7 @@ runs:
         echo "::group::Set build user/host"
 
         BUILD_USER="nullptr_t"
-        BUILD_HOST="EmberHeart"
+        BUILD_HOST="dragonw1nd"
 
         echo "KBUILD_BUILD_USER=${BUILD_USER}" >> "${GITHUB_ENV}"
         echo "KBUILD_BUILD_HOST=${BUILD_HOST}" >> "${GITHUB_ENV}"

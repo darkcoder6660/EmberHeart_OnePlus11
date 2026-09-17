@@ -154,9 +154,9 @@ runs:
       run: |
         set -euo pipefail
         if [[ -n "${{ inputs.susfs_version }}" ]]; then
-          RELEASE_NAME="${PRODUCT} ( ${CODENAME} ) ${OS} EmberHeart Kernel With KernelSU Next ${{ inputs.ksun_tag }} , Nethunter & SUSFS ${{ inputs.susfs_version }}"
+          RELEASE_NAME="${PRODUCT} ( ${CODENAME} ) ${OS} Dragonw1nd Kernel With KernelSU Next ${{ inputs.ksun_tag }} , Nethunter & SUSFS ${{ inputs.susfs_version }}"
         else
-          RELEASE_NAME="${PRODUCT} ( ${CODENAME} ) ${OS} EmberHeart Kernel With KernelSU Next ${{ inputs.ksun_tag }} & Nethunter"
+          RELEASE_NAME="${PRODUCT} ( ${CODENAME} ) ${OS} Dragonw1nd Kernel With KernelSU Next ${{ inputs.ksun_tag }} & Nethunter"
         fi
         echo "RELEASE_NAME=${RELEASE_NAME}" >> "${GITHUB_ENV}"
 

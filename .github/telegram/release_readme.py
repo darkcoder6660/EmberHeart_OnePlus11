@@ -17,7 +17,7 @@ Usage:
         --kernel-version 6.1.87 --ksun-tag v1.2.3 --ksun-version v1.2.3-abcdef \
         --susfs-version v1.5.7 \
         --feat realtek --feat ath \
-        --file EmberHeart.zip --file boot.img \
+        --file Dragonw1nd.zip --file boot.img \
         --out release_notes.md
 """
 from __future__ import annotations

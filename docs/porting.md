@@ -1,6 +1,6 @@
-# Porting EmberHeart to New Devices
+# Porting Dragonw1nd to New Devices
 
-This guide explains how to add support for a new device (OnePlus, Xiaomi/Redmi/POCO, or any other GKI-based device) to the EmberHeart CI/CD pipeline.
+This guide explains how to add support for a new device (OnePlus, Xiaomi/Redmi/POCO, or any other GKI-based device) to the Dragonw1nd CI/CD pipeline.
 
 First star this repo, create a fork and follow the instructions given below.
 
@@ -17,7 +17,7 @@ To port a new device you need, at minimum:
 4. **Source Branch** and **Manifest XML** for the kernel/vendor source tree (from the vendor's kernel manifest repo, or a custom one hosted under `nullptr-t-oss/kernel_patches`).
 5. **Boot/vendor_boot partition sizes** in bytes for the device (found in its `boot_partition_size`/`vendor_boot_partition_size` in the vendor's `BoardConfig.mk` or an existing dump, or from a working AOSP/LineageOS device tree).
 
-Unlike some other GKI kernel projects, **EmberHeart does not patch a stock `boot.img`** — `.github/kernel` builds a fresh `boot.img` from scratch with `mkbootimg` (v4 header, no ramdisk) using the freshly compiled kernel `Image`, and signs it with `avbtool`. You do not need to supply a stock boot image for the standard flow.
+Unlike some other GKI kernel projects, **Dragonw1nd does not patch a stock `boot.img`** — `.github/kernel` builds a fresh `boot.img` from scratch with `mkbootimg` (v4 header, no ramdisk) using the freshly compiled kernel `Image`, and signs it with `avbtool`. You do not need to supply a stock boot image for the standard flow.
 
 ## 1. Create the Device Config File
 
@@ -141,7 +141,7 @@ There is currently no "build all devices" option — each run builds exactly one
 Once `configs/<MODEL>.json` exists and the model has been added to the dropdown:
 
 1. Go to the **Actions** tab in GitHub.
-2. Select **"Build and Release EmberHeart Kernel and Kernel Modules"**.
+2. Select **"Build and Release Dragonw1nd Kernel and Kernel Modules"**.
 3. Click **Run workflow**.
 4. Set **Model** to your new device and **Manifest** to one of the `manifest_<name>` keys you defined for it.
 5. Watch the "Parse op_config_json" and "Set Manifest & grab OS details" step logs in the `Setup Build Environment` job to confirm the expected values (codename, os_short, partition sizes, etc.) were parsed correctly before the source sync even starts.
