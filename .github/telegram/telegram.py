@@ -194,7 +194,7 @@ def build_message(args: argparse.Namespace, ctx: bi.GitHubContext) -> tuple[str,
     if files_md:
         parts.append(files_md)
 
-    parts.append(f"> Build completed in {duration}\n")
+    parts.append(f"> Build completed in {duration}")
     parts.append(f"> Started at : {start_human}")
     parts.append(build_nav_buttons(ctx))
 
