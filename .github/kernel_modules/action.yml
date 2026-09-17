@@ -18,6 +18,7 @@ runs:
         touch arch/arm64/configs/modules.config
 
     - name: Add nethunter specfic drivers already present in kernel to be built as modules
+      id: config_features
       shell: bash
       run: |
         set -euo pipefail
@@ -84,6 +85,8 @@ runs:
           -e CONFIG_MAC80211_RC_MINSTREL \
           -m CONFIG_CAN_SLCAN
 
+        echo "FEATURES=${FEATURES:-} ralink ath mediatek can_slcan mac80211_extras" >> "${GITHUB_ENV}"
+
     - name: Add my kernel patches to msm kernel
       shell: bash
       run: |
@@ -127,3 +130,4 @@ runs:
         git clone https://github.com/lwfinger/rtw88.git
         sed -i 's/$(CONFIG_RTW88)/m/g' Makefile
         sed -i '/^source "drivers\/net\/wireless\/realtek\/rtw88\/Kconfig"$/s/.*/ /' Kconfig
+        echo "FEATURES=${FEATURES:-} rtw88" >> "${GITHUB_ENV}"

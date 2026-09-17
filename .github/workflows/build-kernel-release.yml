@@ -210,12 +210,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ inputs.release_type }}" != "none" ]; then
+          if [ "${{ inputs.release_type }}" == "Release" ]; then
             echo "thread_id=${{ vars.TG_THREAD_RELEASE }}" >> "${GITHUB_OUTPUT}"
           else
             echo "thread_id=${{ vars.TG_THREAD_DEV }}" >> "${GITHUB_OUTPUT}"
           fi
           echo "short_sha=$(echo '${{ github.sha }}' | cut -c1-7)" >> "${GITHUB_OUTPUT}"
+
+      - name: Track build start time
+        if: steps.tg_check.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BUILD_START=$(date +%s)" >> "${GITHUB_ENV}"
 
       - name: Start local Telegram Bot API server
         id: tg_server
@@ -252,32 +259,6 @@ jobs:
           done
           echo "::warning::Local Bot API server did not become ready in time — notifications will be skipped for this run."
           echo "enabled=false" >> "${GITHUB_OUTPUT}"
-
-      - name: Notify - Build Started
-        if: steps.tg_check.outputs.enabled == 'true' && steps.tg_server.outputs.api_base != ''
-        uses: ./.github/telegram
-        with:
-          bot_token: ${{ secrets.TG_BOT_TOKEN }}
-          chat_id: ${{ vars.TG_CHAT_ID }}
-          thread_id: ${{ steps.tg_thread.outputs.thread_id }}
-          api_base_url: ${{ steps.tg_server.outputs.api_base }}
-          mode: rich
-          message: |
-            # Build Started
-            ##### Release type : ${{ inputs.release_type }}
-            <footer>Triggered by ${{ github.actor }}</footer>
-
-            ---
-
-            | Device | ${{ matrix.product }} |
-            | --- | --- |
-            | Branch | ${{ github.ref_name }} |
-            | Manifest | ${{ inputs.manifest }} |
-            | Optimization | ${{ inputs.optimize_level }} |
-            | LTO | ${{ inputs.lto }} |
-
-            > Commit: [${{ steps.tg_thread.outputs.short_sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) <br>
-            > Run: [#${{ github.run_number }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
       - name: Setup Build Environment
         id: setup_env
@@ -338,244 +319,19 @@ jobs:
           tg_thread_id: ${{ steps.tg_thread.outputs.thread_id }}
           tg_api_base: ${{ steps.tg_server.outputs.api_base }}
           tg_send_debug: ${{ inputs.release_type == 'none' }}
-
-      - name: Check for failure (if applicable)
-        id: tg_fail_stage
-        if: (failure() || cancelled()) && steps.tg_check.outputs.enabled == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          STAGE="Unknown stage"
-          REASON="Failed"
-          EMOJI="❌"
-
-          SETUP_ENV_OUTCOME="${{ steps.setup_env.outcome }}"
-          BUILD_KERNEL_OUTCOME="${{ steps.build_kernel.outcome }}"
-          BUILD_MODULES_OUTCOME="${{ steps.build_modules.outcome }}"
-
-          if [ "$SETUP_ENV_OUTCOME" == "failure" ] || [ "$SETUP_ENV_OUTCOME" == "cancelled" ]; then
-            STAGE="Environment Setup"
-            [ "$SETUP_ENV_OUTCOME" == "cancelled" ] && { REASON="Cancelled"; EMOJI="🚫"; }
-          elif [ "$BUILD_KERNEL_OUTCOME" == "failure" ] || [ "$BUILD_KERNEL_OUTCOME" == "cancelled" ]; then
-            STAGE="Kernel Build"
-            [ "$BUILD_KERNEL_OUTCOME" == "cancelled" ] && { REASON="Cancelled"; EMOJI="🚫"; }
-          elif [ "$BUILD_MODULES_OUTCOME" == "failure" ] || [ "$BUILD_MODULES_OUTCOME" == "cancelled" ]; then
-            STAGE="Kernel Modules Build"
-            [ "$BUILD_MODULES_OUTCOME" == "cancelled" ] && { REASON="Cancelled"; EMOJI="🚫"; }
-          fi
-
-          echo "stage=$STAGE" >> "${GITHUB_OUTPUT}"
-          echo "reason=$REASON" >> "${GITHUB_OUTPUT}"
-          echo "emoji=$EMOJI" >> "${GITHUB_OUTPUT}"
-
-      - name: Notify - Build Failed
-        if: (failure() || cancelled()) && steps.tg_check.outputs.enabled == 'true'
-        uses: ./.github/telegram
-        with:
-          bot_token: ${{ secrets.TG_BOT_TOKEN }}
-          chat_id: ${{ vars.TG_CHAT_ID }}
-          thread_id: ${{ steps.tg_thread.outputs.thread_id }}
-          api_base_url: ${{ steps.tg_server.outputs.api_base }}
-          mode: rich
-          message: |
-            # ${{ steps.tg_fail_stage.outputs.emoji }} Build ${{ steps.tg_fail_stage.outputs.reason }}
-
-            | Device | ${{ matrix.product }} |
-            | --- | --- |
-            | Stage | ${{ steps.tg_fail_stage.outputs.stage }} |
-
-            > Branch: ${{ github.ref_name }} <br>
-            > Triggered by: ${{ github.actor }}
-
-            > Commit: [${{ steps.tg_thread.outputs.short_sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) <br>
-            > Run: [#${{ github.run_number }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          release_type: ${{ inputs.release_type }}
+          lto: ${{ inputs.lto }}
+          optimize_level: ${{ inputs.optimize_level }}
+          kernel_uname: ${{ inputs.kernel_uname }}
+          ksun_version: ${{ steps._kernel.outputs.ksun_version }}
+          ksun_tag: ${{ steps._kernel.outputs.ksun_tag }}
+          susfs_version: ${{ steps._kernel.outputs.susfs_version }}
+          kernel_version: ${{ steps._kernel.outputs.kernel_version }}
+          build_start: ${{ env.BUILD_START }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Stop local Telegram Bot API server
         if: always() && steps.tg_check.outputs.enabled == 'true'
         shell: bash
         run: docker rm -f "${{ steps.tg_server.outputs.container_name }}" || true
 
-  trigger-release:
-    needs:
-      - build
-    runs-on: ubuntu-latest
-    if: ${{ inputs.release_type != 'none' }}
-    env:
-      REPO_OWNER: ${{ github.repository_owner }}
-      REPO_NAME: ${{ github.event.repository.name }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download Wirless Firmware Module for Nethunter 
-        id: download_external
-        env:
-          SOURCE_REPO: nullptr-t-oss/Nethunter-Wireless-Firmware 
-        run: |
-          echo "--- Downloading Latest Release Asset from $SOURCE_REPO ---"
-
-          DOWNLOAD_DIR="./downloaded-artifacts/wireless-firmware"
-          mkdir -p "$DOWNLOAD_DIR"
-
-          LATEST_RELEASE_TAG=$(gh api \
-            repos/$SOURCE_REPO/releases/latest \
-            --jq '.tag_name')
-
-          if [ -z "$LATEST_RELEASE_TAG" ]; then
-            echo "::warning::Could not find a latest release in $SOURCE_REPO. Skipping external download."
-            exit 0
-          fi
-
-          echo "Found latest release tag: $LATEST_RELEASE_TAG"
-
-          SOURCE_REPO_NAME=$(basename $SOURCE_REPO)
-          EXPECTED_ASSET_NAME="${SOURCE_REPO_NAME}-${LATEST_RELEASE_TAG}.zip"
-
-          gh release download $LATEST_RELEASE_TAG \
-            --repo $SOURCE_REPO \
-            --pattern $EXPECTED_ASSET_NAME \
-            --dir $DOWNLOAD_DIR \
-            --clobber
-
-          echo "Finished downloading $EXPECTED_ASSET_NAME to $DOWNLOAD_DIR."
-
-      - name: Generate Release name
-        run: |
-          DEVICE="${{ needs.build.outputs.product }}"
-
-          if [[ -n "${{ needs.build.outputs.susfs_version }}" ]]; then
-            RELEASE_NAME="${DEVICE} ( ${{ needs.build.outputs.codename }} ) ${{ needs.build.outputs.os }} EmberHeart Kernel With KernelSU Next ${{ needs.build.outputs.ksun_tag }}, Nethunter & SUSFS ${{ needs.build.outputs.susfs_version }}"
-          else
-            RELEASE_NAME="${DEVICE} ( ${{ needs.build.outputs.codename }} ) ${{ needs.build.outputs.os }} EmberHeart Kernel With KernelSU Next ${{ needs.build.outputs.ksun_tag }} & Nethunter"
-          fi
-          echo "RELEASE_NAME=$RELEASE_NAME" >> "${GITHUB_ENV}"
-
-      - name: Generate and Create New Tag
-        run: |
-          BASE_TAG="${{ needs.build.outputs.codename }}-${{ needs.build.outputs.os_short }}-${{ needs.build.outputs.ksun_tag }}-r0"
-          LATEST_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags --jq '.[0].name')
-          if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="$BASE_TAG"
-          else
-            LATEST_TAG=$(printf "%s\n%s\n" "$LATEST_TAG" "$BASE_TAG" | sort -rV | head -n1)
-          fi
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-          echo "New tag: $NEW_TAG"
-          echo "NEW_TAG=${NEW_TAG}" >> ${GITHUB_ENV}
-          git tag $NEW_TAG
-          git push origin $NEW_TAG
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./downloaded-artifacts
-
-      - name: Generate Device List and Final Release Notes
-        id: generate-notes
-        run: |
-          echo "=== Start building the release notes ==="
-          
-          if [[ -n "${{ needs.build.outputs.susfs_version }}" ]]; then
-            cat << EOF > release_notes.md
-          This release contains KernelSU Next ${{ needs.build.outputs.ksun_tag }}, Nethunter and SUSFS ${{ needs.build.outputs.susfs_version }}
-
-          Module:
-          -> https://github.com/sidex15/ksu_module_susfs
-          EOF
-          else
-            cat << EOF > release_notes.md
-          This release contains KernelSU Next ${{ needs.build.outputs.ksun_tag }} & Nethunter
-          EOF
-          fi
-
-          cat << EOF >> release_notes.md
-
-          Official Managers:
-          -> https://github.com/KernelSU-Next/KernelSU-Next  
-
-          ### Built Device
-
-          | Model | Kernel Version |
-          |-------|----------------|
-          EOF
-
-
-          model=${{ needs.build.outputs.product }}
-          version=${{ needs.build.outputs.kernel_version }}
-          printf "| %-12s | %-16s |\n" "$model" "$version" >> release_notes.md
-
-          # Add features and finalize
-          cat << EOF >> release_notes.md
-
-          ### Features
-          - [+] KernelSU-Next ${{ needs.build.outputs.ksun_tag }} ( ${{ needs.build.outputs.ksun_version }} )
-          EOF
-
-          if [[ -n "${{ needs.build.outputs.susfs_version }}" ]]; then
-            cat << EOF >> release_notes.md
-          - [+] SUSFS ${{ needs.build.outputs.susfs_version }}
-          EOF
-          fi
-
-          cat << EOF >> release_notes.md
-          - [+] Wireguard Support
-          - [+] Magic Mount Support
-          - [+] Ptrace message leak fix for kernels < 5.16
-          - [+] Manual Hooks [scope_min_manual_hooks_v1.4]
-          - [+] CONFIG_TMPFS_XATTR Support [Mountify Support]
-          - [+] BBR v1 Support
-          - [+] Baseband Guard Support (BBG)
-          - [+] Nethunter Support
-          - [+] Mem kernel driver by @Poko-Apps [r/w to physical memory]
-          - [+] IP Set Support
-
-          > [!NOTE]
-          > Some features might vary depending on the model due to compatibility issues
-
-          > [!IMPORTANT]
-          > Codename: ${{ needs.build.outputs.codename }}
-          > Supported OS version: ${{ needs.build.outputs.os }}
-          > Kernel Image hash : ${{ needs.build.outputs.kernel_sha256 }}
-          > boot.img hash : ${{ needs.build.outputs.boot_sha256 }}
-          EOF
-
-          if [[ "${{ inputs.compile_dlkm }}" == "true" ]]; then
-            cat << EOF >> release_notes.md
-          > system_dlkm.img hash : ${{ needs.build.outputs.system_dlkm_sha256 }}
-          > vendor_boot.img hash : ${{ needs.build.outputs.vendor_boot_sha256 }}
-          > vendor_dlkm.img hash : ${{ needs.build.outputs.vendor_dlkm_sha256 }}
-          EOF
-          fi
-
-          # Output for debugging
-          echo "--- Final Release Notes ---"
-          cat release_notes.md
-
-      - name: Create GitHub Pre-release
-        if: ${{ inputs.release_type == 'Pre-release' }}
-        run: |
-          gh release create "${{ env.NEW_TAG }}" \
-            --repo "${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}" \
-            --title "*Test-build*-${{ env.RELEASE_NAME }}-*Test Build*" \
-            --notes-file release_notes.md \
-            --prerelease
-
-      - name: Create GitHub Release
-        if: ${{ inputs.release_type == 'Release' }}
-        run: |
-          gh release create "${{ env.NEW_TAG }}" \
-            --repo "${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}" \
-            --title "${{ env.RELEASE_NAME }}" \
-            --notes-file release_notes.md
-
-      - name: Upload Release Assets Dynamically
-        run: |
-          for file in ./downloaded-artifacts/*/*.{zip,img}; do
-            if [ -f "${file}" ]; then
-              echo "Uploading ${file}..."
-              gh release upload "${{ env.NEW_TAG }}" "${file}" --clobber
-            fi
-          done

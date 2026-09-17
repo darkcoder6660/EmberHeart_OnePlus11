@@ -377,6 +377,8 @@ runs:
           fi
         fi
 
+        echo "FEATURES=${FEATURES:-} susfs" >> "${GITHUB_ENV}"
+
         echo "SuSFS added ✅"
         echo "::endgroup::"
 
@@ -411,6 +413,8 @@ runs:
 
         ( "${MTIME_CACHE}" -t -d "${ROOT_DIR}/Baseband-guard" -k bbg )
 
+        echo "FEATURES=${FEATURES:-} bbg" >> "${GITHUB_ENV}"
+
         echo "BBG LSM added ✅"
         echo "::endgroup::"
 
@@ -434,6 +438,8 @@ runs:
           -d CONFIG_KSU_KPROBES_HOOK \
           -e CONFIG_TMPFS_XATTR \
           -e CONFIG_TMPFS_POSIX_ACL
+
+        echo "FEATURES=${FEATURES:-} ksun" >> "${GITHUB_ENV}"
 
         echo "KernelSU and SUSFS configuration added ✅"
         echo "::endgroup::"
@@ -660,6 +666,8 @@ runs:
           -e CONFIG_USB_SERIAL_FTDI_SIO \
           -e CONFIG_USB_SERIAL_PL2303
 
+        echo "FEATURES=${FEATURES:-} bluetooth can sdr usb_serial" >> "${GITHUB_ENV}"
+
         echo "Nethunter configs applied ✅"
         echo "::endgroup::"
 
@@ -672,6 +680,8 @@ runs:
 
         ./scripts/config --file arch/arm64/configs/kernel.config \
           -e CONFIG_LRU_GEN_ENABLED
+
+        echo "FEATURES=${FEATURES:-} lru_gen" >> "${GITHUB_ENV}"
 
         # Add for Droidspaces support
         echo "Applying patch to enable SYSVIPC without breaking ABI"
@@ -740,6 +750,8 @@ runs:
                   -e CONFIG_NETFILTER_XT_TARGET_LOG \
                   -e CONFIG_NETFILTER_XT_MATCH_RECENT \
                   -e CONFIG_USER_NS
+
+        echo "FEATURES=${FEATURES:-} ds" >> "${GITHUB_ENV}"
 
         echo "Other configs added ✅"
         echo "::endgroup::"
