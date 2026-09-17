@@ -246,6 +246,7 @@ runs:
       run: |
         set -euo pipefail
         python3 "${{ github.action_path }}/../telegram/telegram.py" \
+          --banner "${{ github.action_path }}/../../assets/banner.png" \
           --product "${PRODUCT}" \
           --release-type "${{ inputs.release_type }}" \
           --lto "${{ inputs.lto }}" \
