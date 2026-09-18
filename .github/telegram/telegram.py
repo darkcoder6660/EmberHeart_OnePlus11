@@ -39,7 +39,7 @@ HERE = Path(__file__).resolve().parent
 RELEASE_CHIP = {
     # release_type value -> (label, tg-button style)
     "none":        ("Canary",      "danger"),
-    "Pre-release": ("Pre-release", "primary"),
+    "Pre-release": ("Pre-release", "danger"),
     "Release":     ("Release",     "success"),
 }
 
@@ -119,7 +119,7 @@ def build_files_block(entries: list[bi.FileEntry]) -> tuple[str, list[dict], dic
         filename = os.path.basename(e.path)
         lines.append(f"![{html.escape(filename)}](tg://document?id={e.attach_id})")
         lines.append("SHA256 Checksum")
-        lines.append(f"```\n{e.sha256}\n```")
+        lines.append(f"<blockquote expandable>{e.sha256}</blockquote>")
         media.append({"id": e.attach_id, "media": {"type": "document", "media": f"attach://{e.attach_id}"}})
         attach_paths[e.attach_id] = e.path
     return "\n\n".join(lines), media, attach_paths
@@ -152,7 +152,7 @@ def build_nav_buttons(ctx: bi.GitHubContext) -> str:
         f'  <tg-button type="url" url="{ctx.run_url}">Run #{ctx.run_number}</tg-button>',
         "</tg-button-row>",
         "<tg-button-row>",
-        f'  <tg-button type="url" style="primary" url="{GITHUB_PROFILE_URL}">Follow me on GitHub</tg-button>',
+        f'  <tg-button type="url" style="success" url="{GITHUB_PROFILE_URL}">Follow me on GitHub</tg-button>',
         "</tg-button-row>",
         "<tg-button-row>",
         f'  <tg-button type="url" style="primary" url="{PROJECT_URL}">Star this project</tg-button>',
@@ -184,6 +184,8 @@ def build_message(args: argparse.Namespace, ctx: bi.GitHubContext) -> tuple[str,
         parts.append(f"# {html.escape(args.product)}")
         parts.append(release_chip(args.release_type, args.release_tag))
 
+    parts.append(f"<blockquote>Team Dragonw1nd</blockquote>\n")
+
     if not args.debug_bundle:
         feats_block = build_features_block(feats)
         if feats_block:
@@ -194,9 +196,9 @@ def build_message(args: argparse.Namespace, ctx: bi.GitHubContext) -> tuple[str,
     if files_md:
         parts.append(files_md)
 
-    parts.append(f"> Build completed in {duration}")
-    parts.append(f"> Started at : {start_human}")
+    parts.append(f"<blockquote>Build completed in {duration}<br>Build started at : {start_human}</blockquote>")
     parts.append(build_nav_buttons(ctx))
+    parts.append(f"\n<blockquote>Join our <a href='https://t.me/init_user0'>telegram group</a> for support :)</blockquote>")
 
     markdown = "\n\n".join(p for p in parts if p)
     return markdown, media, attach_paths
