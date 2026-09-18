@@ -221,6 +221,14 @@ runs:
           KSUN_COMMIT_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/${KSUN_COMMIT_SHA_FULL}"
         fi
 
+        BANNER_ARGS=()
+        BANNER_PATH="${{ github.action_path }}/../../assets/banner.png"
+        if [ -f "${BANNER_PATH}" ]; then
+          BANNER_ARGS=(--banner "${BANNER_PATH}")
+        else
+          echo "::warning::[distribution] Banner image not found at ${BANNER_PATH} — sending without one."
+        fi
+
         python3 "${{ github.action_path }}/../telegram/telegram.py" \
           --product "${PRODUCT}" \
           --release-type "${{ inputs.release_type }}" \
@@ -232,6 +240,7 @@ runs:
           --ksun-version "${{ inputs.ksun_version }}" \
           --ksun-commit-url "${KSUN_COMMIT_URL}" \
           --build-start "${{ inputs.build_start }}" \
+          "${BANNER_ARGS[@]}" \
           "${FEAT_ARGS[@]}" \
           "${FILE_ARGS[@]}"
 
