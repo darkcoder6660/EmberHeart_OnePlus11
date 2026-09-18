@@ -629,7 +629,7 @@ runs:
         done
         _line
 
-        find "${MODULES_STAGING_DIR}" -name "${QCACLD_DEV_NAME}.ko" -execdir mv -i -- "{}" "qca_cld3_${QCACLD_DEV_NAME}.ko" \;
+        find "${MODULES_STAGING_DIR}" -name "${QCACLD_DEV_NAME}.ko" -execdir mv -f -- "{}" "qca_cld3_${QCACLD_DEV_NAME}.ko" \;
 
         # Create modules archive
         ( 
