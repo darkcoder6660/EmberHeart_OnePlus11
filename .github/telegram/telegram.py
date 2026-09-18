@@ -244,17 +244,25 @@ def send(args: argparse.Namespace, markdown: str, media: list[dict], attach_path
 
     body, content_type = encode_multipart(fields, file_fields)
     url = f"{args.api_base.rstrip('/')}/bot{args.bot_token}/sendRichMessage"
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": content_type}, method="POST")
 
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode(errors="replace")
-        print(f"::warning::[telegram] sendRichMessage failed (HTTP {e.code}): {err_body}", file=sys.stderr)
-        return
-    except urllib.error.URLError as e:
-        print(f"::warning::[telegram] sendRichMessage request failed: {e}", file=sys.stderr)
+    result = None
+    last_error = None
+    for attempt in (1, 2):
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": content_type}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                result = json.loads(resp.read().decode())
+            break
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode(errors="replace")
+            print(f"::warning::[telegram] sendRichMessage failed (HTTP {e.code}): {err_body}", file=sys.stderr)
+            return
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last_error = e
+            print(f"::warning::[telegram] sendRichMessage attempt {attempt} failed: {e}", file=sys.stderr)
+
+    if result is None:
+        print(f"::warning::[telegram] sendRichMessage failed after retry: {last_error}", file=sys.stderr)
         return
 
     if not result.get("ok"):
@@ -280,7 +288,13 @@ def main() -> None:
         print(json.dumps(attach_paths, indent=2))
         return
 
-    send(args, markdown, media, attach_paths)
+    try:
+        send(args, markdown, media, attach_paths)
+    except Exception as e:
+        # Last-resort safety net: nothing in here should ever be allowed to
+        # fail the CI job that called this script — a build succeeding but
+        # its Telegram ping failing is a warning, not a build failure.
+        print(f"::warning::[telegram] Unexpected error while sending notification: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
