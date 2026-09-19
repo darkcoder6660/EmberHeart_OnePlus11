@@ -496,11 +496,11 @@ runs:
         echo "::group::Applying my patches from my repo..."
         cd "${ROOT_DIR}/common"
 
-        if [[ -d "${KERNEL_PATCHES}/kernel_patches/${CODENAME}-${OS_SHORT}/common" ]]; then
+        if [[ -d "${KERNEL_KIT}/kernel_patches/${CODENAME}-${OS_SHORT}/common" ]]; then
           # We don't need to handle this actually but just in case if someone left an empty dir
           shopt -s nullglob
 
-          for patch in "${KERNEL_PATCHES}/kernel_patches/${CODENAME}-${OS_SHORT}/common"/*.patch; do
+          for patch in "${KERNEL_KIT}/kernel_patches/${CODENAME}-${OS_SHORT}/common"/*.patch; do
             if patch -p1 -s -N -F0 --dry-run -i "$patch" >/dev/null 2>&1; then
               echo "Applying patch: ${patch}"
               patch -p1 -N -F0 -i "${patch}"

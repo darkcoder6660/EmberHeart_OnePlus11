@@ -99,11 +99,11 @@ runs:
         fi
         cd "${ROOT_DIR}/${KERNEL_DIR}"
 
-        if [[ -d "${KERNEL_PATCHES}/kernel_patches/${CODENAME}-${OS_SHORT}/msm" ]]; then
+        if [[ -d "${KERNEL_KIT}/kernel_patches/${CODENAME}-${OS_SHORT}/msm" ]]; then
           # We don't need to handle this actually but just in case if someone left an empty dir
           shopt -s nullglob
 
-          for patch in "${KERNEL_PATCHES}/kernel_patches/${CODENAME}-${OS_SHORT}/msm"/*.patch; do
+          for patch in "${KERNEL_KIT}/kernel_patches/${CODENAME}-${OS_SHORT}/msm"/*.patch; do
             if patch -p1 -s -N -F0 --dry-run -i "$patch" >/dev/null 2>&1; then
               echo "Applying patch: ${patch}"
               patch -p1 -N -F0 -i "${patch}"

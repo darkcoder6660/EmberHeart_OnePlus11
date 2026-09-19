@@ -90,7 +90,7 @@ runs:
       run: |
         set -euo pipefail
         echo "::group::Install ccache with ECS"
-        wget -q https://github.com/nullptr-t-oss/kernel_patches/raw/refs/heads/main/bin/ccache-x86-64 -O ccache
+        wget -q https://github.com/nullptr-t-oss/kernel_kit/raw/refs/heads/main/bin/ccache-x86-64 -O ccache
         sudo cp -f ./ccache /usr/bin/ccache
         sudo chmod +x /usr/bin/ccache
         rm -f ./ccache
@@ -218,7 +218,7 @@ runs:
         echo "Using AnyKernel3 branch: $ANYKERNEL_BRANCH"
         git clone --depth=1 https://github.com/nullptr-t-oss/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
         git clone --depth=1 https://github.com/TheWildJames/kernel_patches.git
-        git clone --depth=1 https://github.com/nullptr-t-oss/kernel_patches.git my_patches
+        git clone --depth=1 https://github.com/nullptr-t-oss/kernel_kit.git
 
     - name: Setup Base Environment
       shell: bash
@@ -226,8 +226,8 @@ runs:
         set -euo pipefail
 
         WILD_KERNEL_PATCHES="${GITHUB_WORKSPACE}/kernel_patches"
-        KERNEL_PATCHES="${GITHUB_WORKSPACE}/my_patches"
-        BUILD_CONFIG=${KERNEL_PATCHES}/device/${CODENAME}-${OS_SHORT}/build_config/build.config.${CODENAME}.${OS_SHORT}
+        KERNEL_KIT="${GITHUB_WORKSPACE}/kernel_kit"
+        BUILD_CONFIG=${KERNEL_KIT}/device/${CODENAME}-${OS_SHORT}/build_config/build.config.${CODENAME}.${OS_SHORT}
         
 
         # Export standard gki variables
@@ -239,7 +239,7 @@ runs:
 
 
         DYNAMIC_CACHE_DIR="${OUT_DIR}/dynamic_cache"
-        MTIME_CACHE="${KERNEL_PATCHES}/scripts/dynamic_mtime.sh"
+        MTIME_CACHE="${KERNEL_KIT}/scripts/dynamic_mtime.sh"
 
         echo "Creating folder for configuration: ${ANDROID_BUILD_TOP}"
         mkdir -p "${ANDROID_BUILD_TOP}"
@@ -256,7 +256,7 @@ runs:
         echo "KERNEL_PLATFORM=${KERNEL_PLATFORM}" >> "${GITHUB_ENV}"
 
         echo "WILD_KERNEL_PATCHES=${WILD_KERNEL_PATCHES}" >> "${GITHUB_ENV}"
-        echo "KERNEL_PATCHES=${KERNEL_PATCHES}" >> "${GITHUB_ENV}"
+        echo "KERNEL_KIT=${KERNEL_KIT}" >> "${GITHUB_ENV}"
         echo "BUILD_CONFIG=${BUILD_CONFIG}" >> "${GITHUB_ENV}"
         echo "MTIME_CACHE=${MTIME_CACHE}" >> "${GITHUB_ENV}"
         echo "DYNAMIC_CACHE_DIR=${DYNAMIC_CACHE_DIR}" >> "${GITHUB_ENV}"

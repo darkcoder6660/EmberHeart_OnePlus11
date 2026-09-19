@@ -100,7 +100,7 @@ runs:
       run: |
 
         # Inherit build config to add device specific changes. ROOT_DIR, KERNEL_DIR are exported for
-        # dual tree sources. KERNEL_PATCHES dir can we used for prebuilts (like boot ramdisk,etc)
+        # dual tree sources. KERNEL_KIT dir can we used for prebuilts (like boot ramdisk,etc)
         # Key features implemented as of now :
         # - PRE_DEFCONFIG_CMDS : commands to be run before running make on the defconfigs
         #                        Example use case : Disabling some configs which might not be required
@@ -720,7 +720,7 @@ runs:
           OUT="${OUT_DIR}/gki-kernel"
         fi
 
-        PREBUILTS="${KERNEL_PATCHES}/device/${CODENAME}-${OS_SHORT}/vendor_boot"
+        PREBUILTS="${KERNEL_KIT}/device/${CODENAME}-${OS_SHORT}/vendor_boot"
         if [[ -f "${PREBUILTS}/dtb" ]]; then
           echo "Using dtb from prebuilts."
           cp "${PREBUILTS}/dtb" "${DIST_DIR}/dtb.img"
@@ -743,7 +743,7 @@ runs:
       run: |
         set -euo pipefail
         echo "::group::Create boot image..."
-        PREBUILTS="${KERNEL_PATCHES}/device/${CODENAME}-${OS_SHORT}/boot"
+        PREBUILTS="${KERNEL_KIT}/device/${CODENAME}-${OS_SHORT}/boot"
         IMAGE="${DIST_DIR}/Image${{ steps.build_config.outputs.kernel_compression }}"
 
         if [[ -f "${ROOT_DIR}/tools/mkbootimg/mkbootimg.py" ]]; then
@@ -893,7 +893,7 @@ runs:
       id: create_system_dlkm
       shell: bash
       run: |
-        PREBUILTS="${KERNEL_PATCHES}/device/${CODENAME}-${OS_SHORT}/system_dlkm"
+        PREBUILTS="${KERNEL_KIT}/device/${CODENAME}-${OS_SHORT}/system_dlkm"
         OUT="${OUT_DIR}/gki-kernel/modules_staging"
         UNAME=$(ls "${OUT}/lib/modules/")
         MODULES_STAGING_ROOT="${OUT}/lib/modules/${UNAME}"
@@ -1107,7 +1107,7 @@ runs:
       if: ${{ inputs.compile_dlkm == 'true' }}
       shell: bash
       run: |
-        PREBUILTS="${KERNEL_PATCHES}/device/${CODENAME}-${OS_SHORT}/vendor_boot"
+        PREBUILTS="${KERNEL_KIT}/device/${CODENAME}-${OS_SHORT}/vendor_boot"
         if [[ -f "${ROOT_DIR}/tools/mkbootimg/mkbootimg.py" ]]; then
           MKBOOTIMG="${ROOT_DIR}/tools/mkbootimg/mkbootimg.py"
         else
@@ -1394,7 +1394,7 @@ runs:
       if: ${{ inputs.compile_dlkm == 'true' }}
       shell: bash
       run: |
-        PREBUILTS="${KERNEL_PATCHES}/device/${CODENAME}-${OS_SHORT}/vendor_dlkm"
+        PREBUILTS="${KERNEL_KIT}/device/${CODENAME}-${OS_SHORT}/vendor_dlkm"
         if [[ "${TREE}" == "mixed" ]]; then
           OUT="${OUT_DIR}/msm-kernel/modules_staging"
         else

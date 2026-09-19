@@ -10,7 +10,7 @@
   "clang": "manifest",
   "tree": "monolithic",
   "manifest_custom": {
-    "url": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_patches/refs/heads/main/kernel_manifest/redmi_15.xml",
+    "url": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_kit/refs/heads/main/kernel_manifest/xiaomeme/redmi_15.xml",
     "os": "Evolution X",
     "os_short": "evox"
   },
