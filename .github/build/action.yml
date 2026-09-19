@@ -397,9 +397,10 @@ runs:
         set +x
         _line
 
-        ( cd "${OUT}" && echo "kernel_release=$(make "${MAKE_FLAGS[@]}" O="$OUT" -s kernelrelease)" >> "${GITHUB_ENV}" )
-
         set_localversion
+
+        ( cd "${OUT}" && echo "kernel_release=$(make "${MAKE_FLAGS[@]}" O="${OUT}" -s kernelrelease)" >> "${GITHUB_ENV}" )
+
         set -x
         set_lto
         set +x
