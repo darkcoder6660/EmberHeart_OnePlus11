@@ -3,7 +3,7 @@ name: Update Status Badges
 # Trigger after the main build workflow completes
 on:
   workflow_run:
-    workflows: ["Build and Release OnePlus EmberHeart Kernel and Kernel Modules"]
+    workflows: ["Build and Release Dragonw1nd Kernel and Kernel Modules"]
     types:
       - completed
 

@@ -1,4 +1,4 @@
-name: Build and Release OnePlus EmberHeart Kernel and Kernel Modules
+name: Build and Release Dragonw1nd Kernel and Kernel Modules
 
 permissions:
   contents: write
@@ -16,16 +16,6 @@ on:
           - Pre-release
           - Release
         default: none
-      build_target:
-        description: 'What do you want to build?'
-        required: true
-        type: choice
-        options:
-          - Kernel Only
-          - Modules Only
-          - Mixed Build
-          - Monolithic Build
-        default: Mixed Build
       manifest:
         description: 'Select manifest'
         required: true
@@ -37,17 +27,9 @@ on:
           - OOS16_CUSTOM
           - LOS_22_2
           - LOS_23_2
+          - HOS
+          - CUSTOM
         default: OOS16_CUSTOM
-      evict_unused_ccache:
-        description: 'Do you want to use evict unused ccache?'
-        required: true
-        type: boolean
-        default: true
-      use_custom_repo_parser:
-        description: 'Do you want to use custom repo parser?'
-        required: true
-        type: boolean
-        default: true
       use_opt_patches:
         description: 'Do you want to add optimization patches in kernel?'
         required: true
@@ -73,8 +55,8 @@ on:
         description: "Link Time Optimization level"
         required: true
         type: choice
-        options: [Thin, Full]
-        default: Full
+        options: [none, thin, full]
+        default: none
       clang_version:
         description: "Select Compiler version"
         required: true
@@ -108,7 +90,7 @@ on:
         type: string
         default: ''
       compile_dlkm:
-        description: '[Under Testing dont use] Do you want to use vendor dlkm and boot partitions?'
+        description: 'Do you want to compile vendor dlkm and boot partitions?'
         required: true
         type: boolean
         default: false
@@ -118,13 +100,20 @@ on:
         type: choice
         options:
           - OP11
-          - OP11_LOS
-          - POCO_F6_LOS
+          - OP12
+          - OP12R
+          - POCO_F6
+          - POCO_X6
+          - REDMI_15
+          - REDMI_12
         default: OP11
 
 jobs:
-  set-op-model:
+  set-model:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -135,7 +124,7 @@ jobs:
             configs/
           sparse-checkout-cone-mode: false
 
-      - name: Setup OnePlus Model
+      - name: Setup Model
         id: set-matrix
         shell: bash
         run: |
@@ -170,47 +159,106 @@ jobs:
           filtered=$(jq -c "$jq_filter" matrix.json)
           wrapped=$(jq -n --argjson items "$filtered" '{ include: $items }')
 
-          echo "matrix<<MATRIX_EOF" >> "$GITHUB_OUTPUT"
-          echo "$wrapped" >> "$GITHUB_OUTPUT"
-          echo "MATRIX_EOF" >> "$GITHUB_OUTPUT"
+          echo "matrix<<MATRIX_EOF" >> "${GITHUB_OUTPUT}"
+          echo "$wrapped" >> "${GITHUB_OUTPUT}"
+          echo "MATRIX_EOF" >> "${GITHUB_OUTPUT}"
 
   build:
-    name: Build ${{ matrix.model }} EmberHeart
-    needs: set-op-model
+    name: Build ${{ matrix.product }} Dragonw1nd
+    needs: set-model
     runs-on: ubuntu-latest
     outputs:
-      kernel_version: ${{ steps.build_kernel.outputs.kernel_version }}
-      ksun_version: ${{ steps.build_kernel.outputs.ksun_version }}
-      ksun_tag: ${{ steps.build_kernel.outputs.ksun_tag }}
-      susfs_version: ${{ steps.build_kernel.outputs.susfs_version }}
-      kernel_sha256: ${{ steps.build_kernel.outputs.kernel_sha256 }}
-      boot_sha256: ${{ steps.build_kernel.outputs.boot_sha256 }}
-      system_dlkm_sha256: ${{ steps.build_kernel.outputs.system_dlkm_sha256 }}
-      vendor_boot_sha256:  ${{ steps.build_modules.outputs.vendor_boot_sha256 }}
-      vendor_dlkm_sha256: ${{ steps.build_modules.outputs.vendor_dlkm_sha256 }}
+      product: ${{ matrix.product }}
+      codename: ${{ matrix.codename }}
+      os: ${{ steps.setup_env.outputs.os }}
+      os_short: ${{ steps.setup_env.outputs.os_short }}
+      kernel_version: ${{ steps._kernel.outputs.kernel_version }}
+      ksun_version: ${{ steps._kernel.outputs.ksun_version }}
+      ksun_tag: ${{ steps._kernel.outputs.ksun_tag }}
+      susfs_version: ${{ steps._kernel.outputs.susfs_version }}
+      kernel_sha256: ${{ steps.build.outputs.kernel_sha256 }}
+      boot_sha256: ${{ steps.build.outputs.boot_sha256 }}
+      system_dlkm_sha256: ${{ steps.build.outputs.system_dlkm_sha256 }}
+      vendor_boot_sha256:  ${{ steps.build.outputs.vendor_boot_sha256 }}
+      vendor_dlkm_sha256: ${{ steps.build.outputs.vendor_dlkm_sha256 }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BUILD_TYPE: ${{ inputs.build_target }}
-      CCACHE_BASEDIR: ${{ github.workspace }}
-      CCACHE_COMPILERCHECK: "content"
-      CCACHE_NOHASHDIR: "true"
-      CCACHE_DEPEND: "true"
-      CCACHE_IGNOREOPTIONS: "--sysroot*"
-      CCACHE_DIRECT: "true"
-      CCACHE_FILECLONE: "true"
-      CCACHE_INODE_CACHE: "true"
-      CCACHE_UMASK: "002"
-      CCACHE_SLOPPINESS: "file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale,modules"
-      CCACHE_IS_KERNEL_COMPILING: "true"
-      CCACHE_LOGFILE: "/tmp/kernel_ccache.log"
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.set-op-model.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.set-model.outputs.matrix) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Check Telegram secrets
+        id: tg_check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${{ secrets.TG_BOT_TOKEN }}" ] || [ -z "${{ vars.TG_CHAT_ID }}" ] || [ -z "${{ secrets.TG_API_ID }}" ] || [ -z "${{ secrets.TG_API_HASH }}" ]; then
+            echo "::warning::Telegram secrets not configured — notifications will be skipped (expected on forks)."
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Determine notify thread
+        id: tg_thread
+        if: steps.tg_check.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.release_type }}" == "Release" ]; then
+            echo "thread_id=${{ vars.TG_THREAD_RELEASE }}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "thread_id=${{ vars.TG_THREAD_DEV }}" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "short_sha=$(echo '${{ github.sha }}' | cut -c1-7)" >> "${GITHUB_OUTPUT}"
+
+      - name: Track build start time
+        if: steps.tg_check.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BUILD_START=$(date +%s)" >> "${GITHUB_ENV}"
+
+      - name: Start local Telegram Bot API server
+        id: tg_server
+        if: steps.tg_check.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name tg-bot-api-${{ strategy.job-index }} \
+            -p 0:8081 \
+            -e TELEGRAM_API_ID="${{ secrets.TG_API_ID }}" \
+            -e TELEGRAM_API_HASH="${{ secrets.TG_API_HASH }}" \
+            -e TELEGRAM_LOCAL=true \
+            aiogram/telegram-bot-api:latest
+
+          sleep 2
+
+          if ! docker ps --filter "name=tg-bot-api-${{ strategy.job-index }}" --filter "status=running" | grep -q tg-bot-api; then
+            echo "::warning::Telegram Bot API container is not running — dumping logs and skipping notifications."
+            docker logs "tg-bot-api-${{ strategy.job-index }}" || true
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          HOST_PORT=$(docker port tg-bot-api-${{ strategy.job-index }} 8081/tcp | cut -d: -f2)
+          echo "container_name=tg-bot-api-${{ strategy.job-index }}" >> "${GITHUB_OUTPUT}"
+          echo "api_base=http://localhost:${HOST_PORT}" >> "${GITHUB_OUTPUT}"
+
+          for i in $(seq 1 15); do
+            if curl -sf "http://localhost:${HOST_PORT}/bot${{ secrets.TG_BOT_TOKEN }}/getMe" > /dev/null; then
+              echo "Local Bot API server is up on port ${HOST_PORT}."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::warning::Local Bot API server did not become ready in time — notifications will be skipped for this run."
+          echo "enabled=false" >> "${GITHUB_OUTPUT}"
 
       - name: Setup Build Environment
         id: setup_env
@@ -218,227 +266,72 @@ jobs:
         with:
           op_config_json: ${{ toJSON(matrix) }}
           manifest: ${{ inputs.manifest }}
-          use_custom_repo_parser: ${{ inputs.use_custom_repo_parser }}
           clang_version: ${{ inputs.clang_version }}
           common_branch_or_commit: ${{ inputs.common_branch_or_commit }}
           msm_branch_or_commit: ${{ inputs.msm_branch_or_commit }}
           vendor_branch_or_commit: ${{ inputs.vendor_branch_or_commit }}
           optimize_level: ${{ inputs.optimize_level }}
+          kernel_uname: ${{ inputs.kernel_uname }}
 
-      - name: Build Kernel
-        id: build_kernel
-        if: contains(fromJSON('["Kernel Only", "Mixed Build", "Monolithic Build"]'), inputs.build_target)
+      - name: Kernel modifications
+        id: _kernel
         uses: ./.github/kernel
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.kernel_ccache
-          LDCACHE_DIR: ${{ github.workspace }}/.kernel_lto_cache
         with:
-          ksun_branch_or_hash: ${{ inputs.ksun_branch }}
-          evict_unused_ccache: ${{ inputs.evict_unused_ccache }}
           use_opt_patches: ${{ inputs.use_opt_patches }}
+          ksun_branch_or_hash: ${{ inputs.ksun_branch }}
           use_susfs: ${{ inputs.use_susfs }}
           susfs_commit_hash_or_branch: ${{ inputs.susfs_branch_or_commit }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Kernel Modules modifications
+        id: _modules
+        uses: ./.github/kernel_modules
+
+      - name: Start build
+        id: build
+        uses: ./.github/build
+        env:
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          CCACHE_COMPILERCHECK: "content"
+          CCACHE_NOHASHDIR: "true"
+          CCACHE_DEPEND: "true"
+          CCACHE_IGNOREOPTIONS: "--sysroot*"
+          CCACHE_DIRECT: "true"
+          CCACHE_FILECLONE: "true"
+          CCACHE_INODE_CACHE: "true"
+          CCACHE_UMASK: "002"
+          CCACHE_SLOPPINESS: "file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale,modules"
+          CCACHE_IS_KERNEL_COMPILING: "true"
+        with:
+          use_susfs: ${{ inputs.use_susfs }}
           optimize_level: ${{ inputs.optimize_level }}
           lto: ${{ inputs.lto }}
           kernel_uname: ${{ inputs.kernel_uname }}
           compile_dlkm: ${{ inputs.compile_dlkm }}
 
-      - name: Build Kernel Modules
-        id: build_modules
-        if: contains(fromJSON('["Modules Only", "Mixed Build", "Monolithic Build"]'), inputs.build_target)
-        uses: ./.github/kernel_modules
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.modules_ccache
-          LDCACHE_DIR: ${{ github.workspace }}/.modules_lto_cache
+      - name: Distribution
+        id: distribution
+        uses: ./.github/distribution
         with:
-          optimize_level: ${{ inputs.optimize_level }}
+          tg_enabled: ${{ steps.tg_check.outputs.enabled }}
+          tg_bot_token: ${{ secrets.TG_BOT_TOKEN }}
+          tg_chat_id: ${{ vars.TG_CHAT_ID }}
+          tg_thread_id: ${{ steps.tg_thread.outputs.thread_id }}
+          tg_api_base: ${{ steps.tg_server.outputs.api_base }}
+          tg_send_debug: ${{ inputs.release_type == 'none' }}
+          release_type: ${{ inputs.release_type }}
           lto: ${{ inputs.lto }}
-          evict_unused_ccache: ${{ inputs.evict_unused_ccache }}
-          compile_dlkm: ${{ inputs.compile_dlkm }}
+          optimize_level: ${{ inputs.optimize_level }}
+          kernel_uname: ${{ inputs.kernel_uname }}
+          ksun_version: ${{ steps._kernel.outputs.ksun_version }}
+          ksun_tag: ${{ steps._kernel.outputs.ksun_tag }}
+          susfs_version: ${{ steps._kernel.outputs.susfs_version }}
+          kernel_version: ${{ steps._kernel.outputs.kernel_version }}
+          build_start: ${{ env.BUILD_START }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
 
-  trigger-release:
-    needs:
-      - build
-    runs-on: ubuntu-latest
-    if: ${{ inputs.release_type != 'none' && contains(fromJSON('["Mixed Build", "Monolithic Build"]'), inputs.build_target) }}
-    env:
-      REPO_OWNER: ${{ github.repository_owner }}
-      REPO_NAME: ${{ github.event.repository.name }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      OS_VERSION: $(grep -oi 'oos[0-9]\+' <<< "${{ inputs.manifest }}")
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Stop local Telegram Bot API server
+        if: always() && steps.tg_check.outputs.enabled == 'true'
+        shell: bash
+        run: docker rm -f "${{ steps.tg_server.outputs.container_name }}" || true
 
-      - name: Download Wirless Firmware Module for Nethunter 
-        id: download_external
-        env:
-          SOURCE_REPO: nullptr-t-oss/Nethunter-Wireless-Firmware 
-        run: |
-          echo "--- Downloading Latest Release Asset from $SOURCE_REPO ---"
-
-          DOWNLOAD_DIR="./downloaded-artifacts/wireless-firmware"
-          mkdir -p "$DOWNLOAD_DIR"
-
-          LATEST_RELEASE_TAG=$(gh api \
-            repos/$SOURCE_REPO/releases/latest \
-            --jq '.tag_name')
-
-          if [ -z "$LATEST_RELEASE_TAG" ]; then
-            echo "::warning::Could not find a latest release in $SOURCE_REPO. Skipping external download."
-            exit 0
-          fi
-
-          echo "Found latest release tag: $LATEST_RELEASE_TAG"
-
-          SOURCE_REPO_NAME=$(basename $SOURCE_REPO)
-          EXPECTED_ASSET_NAME="${SOURCE_REPO_NAME}-${LATEST_RELEASE_TAG}.zip"
-
-          gh release download $LATEST_RELEASE_TAG \
-            --repo $SOURCE_REPO \
-            --pattern $EXPECTED_ASSET_NAME \
-            --dir $DOWNLOAD_DIR \
-            --clobber
-
-          echo "Finished downloading $EXPECTED_ASSET_NAME to $DOWNLOAD_DIR."
-
-      - name: Generate Release name
-        run: |
-          DEVICE="OnePlus $(grep -oi "OP[0-9]\+[A-Z]*" <<< "${{ inputs.model }}" || true)"
-
-          if [ -z "$DEVICE" ]; then
-             DEVICE="${{ inputs.model }}"
-          fi
-          if [[ -n "${{ needs.build.outputs.susfs_version }}" ]]; then
-            RELEASE_NAME="$DEVICE EmberHeart Kernel With KernelSU Next ${{ needs.build.outputs.ksun_tag }}, Nethunter & SUSFS ${{ needs.build.outputs.susfs_version }}"
-          else
-            RELEASE_NAME="$DEVICE EmberHeart Kernel With KernelSU Next ${{ needs.build.outputs.ksun_tag }} & Nethunter"
-          fi
-          echo "RELEASE_NAME=$RELEASE_NAME" >> "$GITHUB_ENV"
-
-      - name: Generate and Create New Tag
-        run: |
-          BASE_TAG="${{ needs.build.outputs.ksun_tag }}-r0"
-          LATEST_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags --jq '.[0].name')
-          if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="$BASE_TAG"
-          else
-            LATEST_TAG=$(printf "%s\n%s\n" "$LATEST_TAG" "$BASE_TAG" | sort -rV | head -n1)
-          fi
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-          echo "New tag: $NEW_TAG"
-          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-          git tag $NEW_TAG
-          git push origin $NEW_TAG
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./downloaded-artifacts
-
-      - name: Generate Device List and Final Release Notes
-        id: generate-notes
-        run: |
-          echo "=== Start building the release notes ==="
-          
-          if [[ -n "${{ needs.build.outputs.susfs_version }}" ]]; then
-            cat << EOF > release_notes.md
-          This release contains KernelSU Next ${{ needs.build.outputs.ksun_tag }}, Nethunter and SUSFS ${{ needs.build.outputs.susfs_version }}
-
-          Module:
-          -> https://github.com/sidex15/ksu_module_susfs
-          EOF
-          else
-            cat << EOF > release_notes.md
-          This release contains KernelSU Next ${{ needs.build.outputs.ksun_tag }} & Nethunter
-          EOF
-          fi
-
-          cat << EOF >> release_notes.md
-
-          Official Managers:
-          -> https://github.com/KernelSU-Next/KernelSU-Next  
-
-          Non-Official Managers:
-          -> https://github.com/WildKernels/Wild_KSU
-
-          ### Built Devices
-
-          | Model | Kernel Version |
-          |-------|----------------|
-          EOF
-
-          # Generate table rows
-          find downloaded-artifacts -name "*.txt" -type f | sort | while read -r file; do
-            if [ -n "$file" ]; then
-              model=$(basename "$file" .txt)
-              version=$(cat "$file")
-              printf "| %-12s | %-16s |\n" "$model" "$version" >> release_notes.md
-            fi
-          done
-
-          # Add features and finalize
-          cat << EOF >> release_notes.md
-
-          ### Features
-          - [+] KernelSU-Next ${{ needs.build.outputs.ksun_tag }} ( ${{ needs.build.outputs.ksun_version }} )
-          EOF
-
-          if [[ -n "${{ needs.build.outputs.susfs_version }}" ]]; then
-            cat << EOF >> release_notes.md
-          - [+] SUSFS ${{ needs.build.outputs.susfs_version }}
-          EOF
-          fi
-
-          cat << EOF >> release_notes.md
-          - [+] Wireguard Support
-          - [+] Magic Mount Support
-          - [+] Ptrace message leak fix for kernels < 5.16
-          - [+] Manual Hooks [scope_min_manual_hooks_v1.4]
-          - [+] CONFIG_TMPFS_XATTR Support [Mountify Support]
-          - [+] BBR v1 Support
-          - [+] Baseband Guard Support (BBG)
-          - [+] Nethunter Support
-          - [+] Mem kernel driver by @Poko-Apps [r/w to physical memory]
-          - [+] IP Set Support
-
-          > [!IMPORTANT]
-          > Kernel Image hash : ${{ needs.build.outputs.kernel_sha256 }}
-          > boot.img hash : ${{ needs.build.outputs.boot_sha256 }}
-          > system_dlkm.img hash : ${{ needs.build.outputs.system_dlkm_sha256 }}
-          > vendor_boot.img hash : ${{ needs.build.outputs.vendor_boot_sha256 }}
-          > vendor_dlkm.img hash : ${{ needs.build.outputs.vendor_dlkm_sha256 }}
-
-          EOF
-
-          # Output for debugging
-          echo "--- Final Release Notes ---"
-          cat release_notes.md
-
-      - name: Create GitHub Pre-release
-        if: ${{ inputs.release_type == 'Pre-release' }}
-        run: |
-          gh release create "${{ env.NEW_TAG }}" \
-            --repo "${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}" \
-            --title "*Test-build*-${{ env.RELEASE_NAME }}-${{ env.OS_VERSION }}*Test Build*" \
-            --notes-file release_notes.md \
-            --prerelease
-
-      - name: Create GitHub Release
-        if: ${{ inputs.release_type == 'Release' }}
-        run: |
-          gh release create "${{ env.NEW_TAG }}" \
-            --repo "${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}" \
-            --title "${{ env.RELEASE_NAME }}-${{ env.OS_VERSION }}" \
-            --notes-file release_notes.md
-
-      - name: Upload Release Assets Dynamically
-        run: |
-          for file in ./downloaded-artifacts/*/*.{zip,img}; do
-            if [ -f "$file" ]; then
-              echo "Uploading $file..."
-              gh release upload "${{ env.NEW_TAG }}" "$file" --clobber
-            fi
-          done
