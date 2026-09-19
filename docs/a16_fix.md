@@ -17,13 +17,13 @@ During the `post-fs-data` stage of the boot process, the Android init binary per
 - The Loop: Because it fails, the hash is never written. Consequently, every single time you reboot, Android thinks it's a "fresh" update and tries to relabel every file in your Nethunter chroot again. This causes massive I/O wait and delays boot by minutes.
 
 ## The Solution
-The [restorehash](https://github.com/nullptr-t-oss/EmberHeart_OnePlus11/raw/refs/heads/main/tools/restorehash) tool automates a workaround. Instead of letting the system fail repeatedly, it calculates the correct hash in a safe environment and forces it onto the `/data` directory.
+The [restorehash](https://github.com/nullptr-t-oss/Dragonw1nd-Kernels/raw/refs/heads/main/tools/restorehash) tool automates a workaround. Instead of letting the system fail repeatedly, it calculates the correct hash in a safe environment and forces it onto the `/data` directory.
 
 ## Installation & Usage
 
 ### Prerequisites
 - Termux (in root shell) or Android Root Shell (Nethunter Terminal)
-- The [restorehash](https://github.com/nullptr-t-oss/EmberHeart_OnePlus11/raw/refs/heads/main/tools/restorehash) binary
+- The [restorehash](https://github.com/nullptr-t-oss/Dragonw1nd-Kernels/raw/refs/heads/main/tools/restorehash) binary
 
 ### Step-by-Step Guide
 - Place the Binary: Move the `restorehash` file to `/data/local/`

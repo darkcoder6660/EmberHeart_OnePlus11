@@ -1,8 +1,5 @@
 name: Setup Build Environment
-
-permissions:
-  contents: write
-  actions: write
+description: "Setup build environment and sync kernel source"
 
 inputs:
   op_config_json:
@@ -13,11 +10,6 @@ inputs:
     required: true
     type: string
     default: OOS15
-  use_custom_repo_parser:
-    description: 'Do you want to use custom repo parser?'
-    required: true
-    type: string
-    default: 'false'
   clang_version:
     required: false
     type: string
@@ -38,6 +30,16 @@ inputs:
     required: false
     type: string
     default: O2  # Choices: O2 or O3
+  kernel_uname:
+    required: false
+    type: string
+    default: ""
+
+outputs:
+  os:
+    value: ${{ steps.set_manifest.outputs.os }}
+  os_short:
+    value: ${{ steps.set_manifest.outputs.os_short }}
 
 runs:
   using: composite
@@ -79,7 +81,7 @@ runs:
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
           git curl ca-certificates build-essential clang lld flex bison \
           libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-          libxml2-utils rsync unzip dwarves file python3
+          libxml2-utils rsync unzip dwarves file python3 mkbootimg device-tree-compiler attr
         sudo apt-get clean
         echo "::endgroup::"
 
@@ -88,7 +90,7 @@ runs:
       run: |
         set -euo pipefail
         echo "::group::Install ccache with ECS"
-        wget -q https://github.com/nullptr-t-oss/kernel_patches/raw/refs/heads/main/bin/ccache-x86-64 -O ccache
+        wget -q https://github.com/nullptr-t-oss/kernel_kit/raw/refs/heads/main/bin/ccache-x86-64 -O ccache
         sudo cp -f ./ccache /usr/bin/ccache
         sudo chmod +x /usr/bin/ccache
         rm -f ./ccache
@@ -106,16 +108,55 @@ runs:
       run: |
         set -euo pipefail
         echo '${{ inputs.op_config_json }}' > /tmp/config.json
-        jq -r 'to_entries[] | "\(.key | ascii_upcase)=\(.value)"' /tmp/config.json >> "$GITHUB_ENV"
+        jq -r 'to_entries[] | select(.value | type == "string" or type == "number" or type == "boolean") | "\(.key | ascii_upcase)=\(.value)"' /tmp/config.json >> "${GITHUB_ENV}"
         echo "Parsed config:"
         jq '.' /tmp/config.json
 
-    - name: Set Manifest
+    - name: Set Manifest & grab OS details
+      id: set_manifest
       shell: bash
       run: |
         set -euo pipefail
-        echo "MANIFEST=$MANIFEST_${{ inputs.manifest }}" >> "$GITHUB_ENV"
-        echo "MANIFEST_NAME=${{ inputs.manifest }}" >> "$GITHUB_ENV"
+        selected=$(echo "${{ inputs.manifest }}" | tr '[:upper:]' '[:lower:]')  # OOS14 -> oos14
+
+        key="manifest_${selected}"
+
+        manifest_url=$(jq -r --arg k "$key" '.[$k].url // empty' /tmp/config.json)
+        os=$(jq -r --arg k "$key" '.[$k].os // empty' /tmp/config.json)
+        os_short=$(jq -r --arg k "$key" '.[$k].os_short // empty' /tmp/config.json)
+
+        if [[ -z "${manifest_url}" ]]; then
+          echo "::error::No manifest found for key '${key}' in config JSON"
+          exit 1
+        fi
+
+        echo "MANIFEST=${manifest_url}" >> "${GITHUB_ENV}"
+        echo "OS=${os}" >> "${GITHUB_ENV}"
+        echo "OS_SHORT=${os_short}" >> "${GITHUB_ENV}"
+
+        echo "os=${os}" >> "${GITHUB_OUTPUT}"
+        echo "os_short=${os_short}" >> "${GITHUB_OUTPUT}"
+
+        echo "Selected manifest: ${manifest_url}"
+        echo "OS: ${os} (${os_short})"
+
+        # Manifest-level overrides
+        # Any extra scalar field in the manifest object (besides url/os/os_short)
+        # is treated as an override for a top-level config key.
+        overrides=$(jq -r --arg k "$key" \
+          '.[$k] | to_entries[]
+           | select(.key != "url" and .key != "os" and .key != "os_short")
+           | select(.value | type == "string" or type == "number" or type == "boolean")
+           | "\(.key | ascii_upcase)=\(.value)"' \
+          /tmp/config.json)
+
+        if [[ -n "${overrides}" ]]; then
+          echo "Applying manifest-level overrides:"
+          echo "${overrides}"
+          echo "${overrides}" >> "${GITHUB_ENV}"
+        else
+          echo "No manifest-level overrides for '${key}'"
+        fi
 
     - name: Validate Inputs
       shell: bash
@@ -167,108 +208,70 @@ runs:
         echo "Input validation OK."
         echo "::endgroup::"
 
+    - name: Clone AnyKernel3 and Other Dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Cloning AnyKernel3 and other dependencies..."
+        ANYKERNEL_BRANCH="gki-2.0"
+
+        echo "Using AnyKernel3 branch: $ANYKERNEL_BRANCH"
+        git clone --depth=1 https://github.com/nullptr-t-oss/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+        git clone --depth=1 https://github.com/TheWildJames/kernel_patches.git
+        git clone --depth=1 https://github.com/nullptr-t-oss/kernel_kit.git
+
     - name: Setup Base Environment
       shell: bash
       run: |
         set -euo pipefail
-        # Derive a unique build directory name
-        set -euo pipefail
-        # Derive a unique build directory name
-        CONFIG="$GITHUB_WORKSPACE/$MODEL"
-        ARTIFACTS_DIR="$CONFIG/artifacts"
-        ARTIFACTS_DIR_DEBUG="$CONFIG/debug/artifacts"
-        KERNEL_PLATFORM="$CONFIG/kernel_platform"
-        COMMON="$KERNEL_PLATFORM/common"
 
-        if [[ "$BUILD_TYPE" == "Mixed Build" || "$BUILD_TYPE" == "Modules Only" ]]; then
-          MSM="$KERNEL_PLATFORM/msm-kernel"
-        else
-          MSM="$COMMON"
-        fi
+        WILD_KERNEL_PATCHES="${GITHUB_WORKSPACE}/kernel_patches"
+        KERNEL_KIT="${GITHUB_WORKSPACE}/kernel_kit"
+        BUILD_CONFIG=${KERNEL_KIT}/device/${CODENAME}-${OS_SHORT}/build_config/build.config.${CODENAME}.${OS_SHORT}
+        
 
-        KBUILD_MIXED_TREE_DIR="$CONFIG/mixed_tree"
-        WILD_KERNEL_PATCHES="$GITHUB_WORKSPACE/kernel_patches"
-        KERNEL_PATCHES="$GITHUB_WORKSPACE/my_patches"
+        # Export standard gki variables
+        ANDROID_BUILD_TOP="${GITHUB_WORKSPACE}/${CODENAME}-${OS_SHORT}"
+        KERNEL_PLATFORM="${ANDROID_BUILD_TOP}/kernel_platform"
+        ROOT_DIR=${KERNEL_PLATFORM}
+        OUT_DIR="${ROOT_DIR}/out"
+        DIST_DIR="${ROOT_DIR}/dist"
 
-        echo "Creating folder for configuration: $CONFIG"
-        mkdir -p "$CONFIG"
 
-        mkdir -p "$ARTIFACTS_DIR"
-        mkdir -p "$ARTIFACTS_DIR_DEBUG"
-        mkdir -p "$KBUILD_MIXED_TREE_DIR"
+        DYNAMIC_CACHE_DIR="${OUT_DIR}/dynamic_cache"
+        MTIME_CACHE="${KERNEL_KIT}/scripts/dynamic_mtime.sh"
 
-        echo "CONFIG=$CONFIG" >> "$GITHUB_ENV"
-        echo "ARTIFACTS_DIR=$ARTIFACTS_DIR" >> "$GITHUB_ENV"
-        echo "ARTIFACTS_DIR_DEBUG=$ARTIFACTS_DIR_DEBUG" >> "$GITHUB_ENV"
-        echo "KERNEL_PLATFORM=$KERNEL_PLATFORM" >> "$GITHUB_ENV"
-        echo "COMMON=$COMMON" >> "$GITHUB_ENV"
-        echo "MSM=$MSM" >> "$GITHUB_ENV"
-        echo "KBUILD_MIXED_TREE_DIR=$KBUILD_MIXED_TREE_DIR" >> "$GITHUB_ENV"
-        echo "WILD_KERNEL_PATCHES=$WILD_KERNEL_PATCHES" >> "$GITHUB_ENV"
-        echo "KERNEL_PATCHES=$KERNEL_PATCHES" >> "$GITHUB_ENV"
+        echo "Creating folder for configuration: ${ANDROID_BUILD_TOP}"
+        mkdir -p "${ANDROID_BUILD_TOP}"
+
+        mkdir -p "${OUT_DIR}"
+        mkdir -p "${DIST_DIR}"
+        mkdir -p "${DYNAMIC_CACHE_DIR}"
+        
+        echo "ANDROID_BUILD_TOP=${ANDROID_BUILD_TOP}" >> "${GITHUB_ENV}"
+
+        echo "ROOT_DIR=${ROOT_DIR}" >> "${GITHUB_ENV}"
+        echo "OUT_DIR=${OUT_DIR}" >> "${GITHUB_ENV}"
+        echo "DIST_DIR=${DIST_DIR}" >> "${GITHUB_ENV}"
+        echo "KERNEL_PLATFORM=${KERNEL_PLATFORM}" >> "${GITHUB_ENV}"
+
+        echo "WILD_KERNEL_PATCHES=${WILD_KERNEL_PATCHES}" >> "${GITHUB_ENV}"
+        echo "KERNEL_KIT=${KERNEL_KIT}" >> "${GITHUB_ENV}"
+        echo "BUILD_CONFIG=${BUILD_CONFIG}" >> "${GITHUB_ENV}"
+        echo "MTIME_CACHE=${MTIME_CACHE}" >> "${GITHUB_ENV}"
+        echo "DYNAMIC_CACHE_DIR=${DYNAMIC_CACHE_DIR}" >> "${GITHUB_ENV}"
+
+        chmod +x "${MTIME_CACHE}"
 
         # Install repo tool if missing
         REPO="/usr/local/bin/repo"
-        if [ ! -x "$REPO" ]; then
+        if [ ! -x "${REPO}" ]; then
           curl -s https://storage.googleapis.com/git-repo-downloads/repo -o "$REPO"
-          chmod +x "$REPO"
+          chmod +x "${REPO}"
         fi
-        echo "REPO=$REPO" >> "$GITHUB_ENV"
-
-    - name: Format Manifest URL
-      if: ${{ inputs.use_custom_repo_parser == 'true' }}
-      shell: bash
-      run: |
-        if [[ "$MANIFEST" =~ ^https?:// ]]; then
-            # It is already a full URL, pass it through
-            echo "MANIFEST=$MANIFEST" >> $GITHUB_ENV
-        else
-            # Convert it to the raw GitHub URL coz my composite action supports only URLs
-            RAW_URL="https://raw.githubusercontent.com/OnePlusOSS/kernel_manifest/${BRANCH}/${MANIFEST}"
-            echo "MANIFEST=${RAW_URL}" >> $GITHUB_ENV
-        fi
-
-    - name: Prepare string to checkout custom branch or revision on custom manifest parser
-      if: ${{ inputs.use_custom_repo_parser == 'true' }}
-      shell: bash
-      run: |
-        OVERRIDES=""
-        cd "$CONFIG"
-
-        if [[ -n "${{ inputs.common_branch_or_commit }}" ]]; then
-          # Calculate the relative path from CONFIG to COMMON
-          # coz we'll use this path to find the required project to be modified in manifest
-          REL_COMMON=$(realpath --relative-to="$CONFIG" "$COMMON")
-          echo "[DEBUG] Calculated relative path: $REL_COMMON"
-
-          OVERRIDES="${REL_COMMON}=${{ inputs.common_branch_or_commit }}"
-        fi
-
-        if [[ -n "${{ inputs.msm_branch_or_commit }}" ]]; then
-          # Calculate the relative path from CONFIG to MSM
-          # coz we'll use this path to find the required project to be modified in manifest
-          REL_MSM=$(realpath --relative-to="$CONFIG" "$MSM")
-          OVERRIDES="$OVERRIDES,${REL_MSM}=${{ inputs.msm_branch_or_commit }}"
-          echo "[DEBUG] Calculated relative path: $REL_MSM"
-        fi
-
-        if [[ -n "${{ inputs.vendor_branch_or_commit }}" ]]; then
-          OVERRIDES="$OVERRIDES,./=${{ inputs.vendor_branch_or_commit }}"
-        fi
-
-        echo "Final override string: ${OVERRIDES#,}"
-        echo "PROJECT_OVERRIDE=${OVERRIDES#,}" >> "$GITHUB_ENV"
-
-    - name: Download source via custom manifest parser
-      if: ${{ inputs.use_custom_repo_parser == 'true' }}
-      uses: nullptr-t-oss/turbo-repo-sync@main
-      with:
-        manifest_path: ${{ env.MANIFEST }}
-        workspace_dir: ${{ env.CONFIG }}
-        project_overrides: ${{ env.PROJECT_OVERRIDE }}
+        echo "REPO=${REPO}" >> "${GITHUB_ENV}"
 
     - name: Optimize Global Git for Repo Tool
-      if: ${{ inputs.use_custom_repo_parser == 'false' }}
       shell: bash
       run: |
         set -euo pipefail
@@ -280,23 +283,22 @@ runs:
         git config --global index.threads $(nproc)
 
     - name: Initialize and Sync Kernel Source
-      if: ${{ inputs.use_custom_repo_parser == 'false' }}
       shell: bash
       run: |
         set -euo pipefail
-        cd "$CONFIG"
+        cd "${ANDROID_BUILD_TOP}"
         echo "Initializing and syncing kernel source..."
-        if [[ "$MANIFEST" == https://* ]]; then
+        if [[ "${MANIFEST}" == https://* ]]; then
           mkdir -p .repo/manifests
-          curl -s --fail --show-error --location --proto '=https' "$MANIFEST" -o .repo/manifests/temp_manifest.xml
-          "$REPO" init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8650 -m temp_manifest.xml --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
+          curl -s --fail --show-error --location --proto '=https' "${MANIFEST}" -o .repo/manifests/temp_manifest.xml
+          "${REPO}" init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8650 -m temp_manifest.xml --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
         else
-          "$REPO" init -u https://github.com/OnePlusOSS/kernel_manifest.git -b "$BRANCH" -m "$MANIFEST" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
+          "${REPO}" init -u https://github.com/OnePlusOSS/kernel_manifest.git -b "${BRANCH}" -m "${MANIFEST}" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
         fi
-        "$REPO" --version
+        "${REPO}" --version
         success=false
         for i in 1 2 3; do
-          if "$REPO" sync -c --no-clone-bundle --no-tags --optimized-fetch \
+          if "${REPO}" sync -c --no-clone-bundle --no-tags --optimized-fetch \
              -j"$(nproc --all)" --fail-fast; then
             success=true
             break
@@ -304,15 +306,14 @@ runs:
           echo "repo sync attempt $i failed; retrying..."
           sleep 30
         done
-        $success || { echo "repo sync failed after 3 attempts"; exit 1; }
+        ${success} || { echo "repo sync failed after 3 attempts"; exit 1; }
 
     - name: Checkout custom branch or commit hash for sources
-      if: ${{ inputs.use_custom_repo_parser == 'false' }}
       shell: bash
       run: |
         set -euo pipefail
 
-        cd "$COMMON"
+        cd "${ROOT_DIR}/common"
         if [[ -z "${{ inputs.common_branch_or_commit }}" ]]; then
           echo "Custom branch or commit not specified, proceeding on current HEAD of common kernel "
           echo "Current HEAD for COMMON kernel repo is at:"
@@ -324,8 +325,7 @@ runs:
           git show HEAD --no-patch
         fi
 
-        cd "$CONFIG"
-
+        cd "${ANDROID_BUILD_TOP}"
         if [[ -z "${{ inputs.vendor_branch_or_commit }}" ]]; then
           echo "Custom branch or commit not specified, proceeding on current HEAD of vendor modules and device tree branch"
           echo "Current HEAD for vendor modules repo is at:"
@@ -337,25 +337,64 @@ runs:
           git show HEAD --no-patch
         fi
         
-        cd "$MSM"
-        if [[ -z "${{ inputs.msm_branch_or_commit }}" ]]; then
-          echo "Custom branch or commit not specified, proceeding on current HEAD of msm kernel"
-          echo "Current HEAD for MSM kernel repo is at:"
-          git show HEAD --no-patch
-        else
-          git fetch --all --depth=1
-          git checkout "${{ inputs.msm_branch_or_commit }}"
-          echo "Current HEAD for MSM kernel repo is at:"
-          git show HEAD --no-patch
+        if [[ "${TREE}" == "mixed" ]]; then
+          cd "${ROOT_DIR}/msm-kernel"
+          if [[ -z "${{ inputs.msm_branch_or_commit }}" ]]; then
+            echo "Custom branch or commit not specified, proceeding on current HEAD of msm kernel"
+            echo "Current HEAD for MSM kernel repo is at:"
+            git show HEAD --no-patch
+          else
+            git fetch --all --depth=1
+            git checkout "${{ inputs.msm_branch_or_commit }}"
+            echo "Current HEAD for MSM kernel repo is at:"
+            git show HEAD --no-patch
+          fi
         fi
+
+    - name: Export build-tools path
+      shell: bash
+      run: |
+        if [[ -d "${ROOT_DIR}/build/build-tools/path/linux-x86" ]]; then
+          echo "${ROOT_DIR}/build/build-tools/path/linux-x86" >> "${GITHUB_PATH}"
+        fi
+
+        if [[ -d "${ROOT_DIR}/prebuilts/kernel-build-tools/linux-x86/bin" ]]; then
+          echo "${ROOT_DIR}/prebuilts/kernel-build-tools/linux-x86/bin" >> "${GITHUB_PATH}"
+        elif [[ -d "${ROOT_DIR}/prebuilts/kernel-build-tools/linux_musl-x86/bin" ]]; then
+          echo "${ROOT_DIR}/prebuilts/kernel-build-tools/linux_musl-x86/bin" >> "${GITHUB_PATH}"
+        else
+          echo "prebuilt bins not found in kplatform, cloning prebuilts from aosp"
+
+          mkdir -p "${ROOT_DIR}/build/build-tools"
+          cd "${ROOT_DIR}/build/build-tools" 
+          wget https://android.googlesource.com/kernel/prebuilts/build-tools/+archive/refs/heads/main-kernel.tar.gz
+          tar -xzf main-kernel.tar.gz
+          rm main-kernel.tar.gz
+
+          if [[ -d "${ROOT_DIR}/build/build-tools/linux-x86/bin" ]]; then
+            echo "${ROOT_DIR}/build/build-tools/linux-x86/bin" >> "${GITHUB_PATH}"
+          elif [[ -d "${ROOT_DIR}/build/build-tools/linux_musl-x86/bin" ]]; then
+            echo "${ROOT_DIR}/build/build-tools/linux_musl-x86/bin" >> "${GITHUB_PATH}"
+          else
+            echo "::error:: couldn't find prebuilt bin path in aosp prebuilts"
+          fi
+        fi
+
+    - name: Prioritize system coreutils over AOSP prebuilt toybox
+      shell: bash
+      run: |
+        # This should fix the following error when setting up Ksun :
+        # realpath: Unknown option 'relative-to=/home/runner/work/EmberHeart-Kernels/EmberHeart-Kernels/salami-oos16/kernel_platform/common/drivers' (see "realpath --help")
+        # ln: cannot create symbolic link from '' to 'kernelsu': No such file or directory
+        #
+        echo "/usr/bin" >> "${GITHUB_PATH}"
 
     - name: Setup clang type
       if: ${{ inputs.clang_version != 'default' }}
       shell: bash
       run: |
         set -euo pipefail
-        echo "CLANG=${{ inputs.clang_version }}" >> "$GITHUB_ENV"
-
+        echo "CLANG=${{ inputs.clang_version }}" >> "${GITHUB_ENV}"
 
     - name: Download Clang (toolchain for build)
       uses: nullptr-t-oss/kernel_toolchains/clang_setup@main
@@ -371,25 +410,47 @@ runs:
         set -euo pipefail
         echo "::group::Detecting Clang..."
         CLANG_FOUND=false
-        for base in "$KERNEL_PLATFORM/prebuilts" "$KERNEL_PLATFORM/prebuilts-master"; do
-          [ -d "$base/clang/host/linux-x86" ] || continue
+        for base in "${KERNEL_PLATFORM}/prebuilts" "${KERNEL_PLATFORM}/prebuilts-master"; do
+          [ -d "${base}/clang/host/linux-x86" ] || continue
 
           latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
-          if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
-            CLANG_BIN="$latest/bin"
+          if [ -n "${latest}" ] && [ -x "${latest}/bin/clang" ]; then
+            CLANG_BIN="${latest}/bin"
             CLANG_FOUND=true
           fi
         done
-        if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
+        if ! ${CLANG_FOUND} && command -v clang >/dev/null 2>&1; then
           CLANG_BIN="$(dirname "$(command -v clang)")"
           CLANG_FOUND=true
           echo "Using system clang."
         fi
-        $CLANG_FOUND || { echo "No clang toolchain found"; exit 1; }
-        echo "${CLANG_BIN}" >> "$GITHUB_PATH"
-        CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
-        echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
-        echo "[NOTICE] Using clang : $CLANG_VERSION"
+        ${CLANG_FOUND} || { echo "No clang toolchain found"; exit 1; }
+        echo "${CLANG_BIN}" >> "${GITHUB_PATH}"
+        CLANG_VERSION="$("${CLANG_BIN}/clang" --version | head -n1)"
+        echo "CLANG_VERSION=${CLANG_VERSION}" >> "${GITHUB_ENV}"
+        echo "[NOTICE] Using clang : ${CLANG_VERSION}"
 
         echo "Clang detected ✅"
         echo "::endgroup::"
+
+    - name: Restore build cache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ env.OUT_DIR }}
+        key: cache-${{ env.CODENAME }}-${{ env.OS_SHORT }}-${{ inputs.optimize_level }}-${{ inputs.kernel_uname }}-${{ env.KERNEL_VERSION }}
+
+    - name: Fast build mtime hack
+      shell: bash
+      run: |
+        # :)
+
+        if [[ "${TREE}" == "mixed" ]]; then
+          ( "${MTIME_CACHE}" -t -d "${ROOT_DIR}/common" -k gki-kernel )
+          ( "${MTIME_CACHE}" -t -d "${ROOT_DIR}/msm-kernel" -k  msm-kernel )
+        else
+          (  "${MTIME_CACHE}" -t -d "${ROOT_DIR}/common" -k gki-kernel )
+        fi
+
+        if [[ -d "${ANDROID_BUILD_TOP}/vendor" ]]; then
+          ( "${MTIME_CACHE}" -t -d "${ANDROID_BUILD_TOP}/vendor" -k vendor )
+        fi

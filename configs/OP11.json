@@ -1,15 +1,50 @@
 {
   "model": "OP11",
+  "product": "OnePlus 11 5G",
   "soc": "kalama",
+  "codename": "salami",
   "branch": "oneplus/sm8550",
   "boot_partition_size": "201326592",
   "vendor_boot_partition_size": "201326592",
   "qcacld_dev_name": "kiwi_v2",
   "clang": "manifest",
-  "manifest_oos14": "oneplus_11_u.xml",
-  "manifest_oos15": "oneplus_11_v.xml",
-  "manifest_oos16": "oneplus_11_b.xml",
-  "manifest_oos16_custom": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_patches/refs/heads/main/kernel_manifest/oneplus_11_b.xml",
+  "tree": "mixed",
+  "manifest_oos14": {
+    "url": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_kit/refs/heads/main/kernel_manifest/oneplus/oneplus_11_u.xml",
+    "os": "OxygenOS 14",
+    "os_short": "oos14"
+  },
+  "manifest_oos15": {
+    "url": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_kit/refs/heads/main/kernel_manifest/oneplus/oneplus_11_v.xml",
+    "os": "OxygenOS 15",
+    "os_short": "oos15"
+  },
+  "manifest_oos16": {
+    "url": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_kit/refs/heads/main/kernel_manifest/oneplus/oneplus_11_b.xml",
+    "os": "OxygenOS 16",
+    "os_short": "oos16"
+  },
+  "manifest_oos16_custom": {
+    "url": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_kit/refs/heads/main/kernel_manifest/oneplus/oneplus_11_b_custom.xml",
+    "os": "OxygenOS 16",
+    "os_short": "oos16"
+  },
+  "manifest_los_22_2": {
+    "url": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_kit/refs/heads/main/kernel_manifest/oneplus/oneplus_11_los_22.2.xml",
+    "os": "LineageOS 22.2",
+    "os_short": "los22.2",
+    "branch" : "los/sm8550",
+    "clang": "aosp-clang-r547379",
+    "tree": "monolithic"
+  },
+  "manifest_los_23_2": {
+    "url": "https://raw.githubusercontent.com/nullptr-t-oss/kernel_kit/refs/heads/main/kernel_manifest/oneplus/oneplus_11_los_23.2.xml",
+    "os": "LineageOS 23.2",
+    "os_short": "los23.2",
+    "branch": "los/sm8550",
+    "clang": "aosp-clang-r547379",
+    "tree": "monolithic"
+  },
   "android_version": "android13",
   "kernel_version": "5.15",
   "hmbird": false
