@@ -90,7 +90,7 @@ on:
         type: string
         default: ''
       compile_dlkm:
-        description: '[Under Testing dont use] Do you want to use vendor dlkm and boot partitions?'
+        description: 'Do you want to compile vendor dlkm and boot partitions?'
         required: true
         type: boolean
         default: false
