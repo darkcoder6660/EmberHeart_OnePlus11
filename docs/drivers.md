@@ -1,4 +1,13 @@
 # Loading Drivers for External Chipsets
+---
+### Starting from commit [091ed19](https://github.com/nullptr-t-oss/Dragonw1nd-Kernels/commit/091ed1948e7b8b74577f409560aaf5944cb014ef), CI can compile bootable dlkm and vendor_boot partitions where users can choose what modules to include or load automatically!
+
+> [!IMPORTANT]
+> - Need to use stock module dump for closed sourced modules
+> - Need to disable avb in vendor_boot fstab to make the custom partitions bootable
+> - Extract relevant props from stock partitions using avbtool and export relevant variables in build config
+
+---
 
 > [!IMPORTANT]
 > ## Loading custom mac80211
