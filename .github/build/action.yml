@@ -1023,6 +1023,9 @@ runs:
               echo "ext4_share_dup_blocks=true" >> ${system_dlkm_props_file}
               echo "extfs_rsv_pct=0" >> ${system_dlkm_props_file}
               echo "journal_size=0" >> ${system_dlkm_props_file}
+            else
+              echo "system_dlkm_erofs_compressor=${SYSTEM_DLKM_EROFS_COMPRESSOR:-lz4hc,9}" >> ${system_dlkm_props_file}
+              echo "system_dlkm_erofs_pcluster_size=${SYSTEM_DLKM_EROFS_PCLUSTER_SIZE:-262144}" >> ${system_dlkm_props_file}
             fi
           else
             echo -e "::debug::Using custom system_dlkm prop file with props:\n$(cat "${SYSTEM_DLKM_PROPS_FILE}")"
@@ -1631,6 +1634,9 @@ runs:
             if [[ "${VENDOR_DLKM_FS_TYPE}" == "ext4" ]]; then
               echo "ext_mkuserimg=mkuserimg_mke2fs" >> ${vendor_dlkm_props_file}
               echo "ext4_share_dup_blocks=true" >> ${vendor_dlkm_props_file}
+            else
+              echo "vendor_dlkm_erofs_compressor=${VENDOR_DLKM_EROFS_COMPRESSOR:-lz4hc,9}" >> ${vendor_dlkm_props_file}
+              echo "vendor_dlkm_erofs_pcluster_size=${VENDOR_DLKM_EROFS_PCLUSTER_SIZE:-262144}" >> ${vendor_dlkm_props_file}
             fi
           else
             echo -e "::debug::Using custom vendor_dlkm prop file with props:\n$(cat "${VENDOR_DLKM_PROPS_FILE}")"
