@@ -1412,6 +1412,7 @@ runs:
         DEPMOD_MODULES_ROOT="${DEPMOD_DIR_ROOT}/vendor/lib/modules"
 
         vendor_dlkm_modules_list="${PREBUILTS}/vendor_dlkm.modules.include"
+        vendor_dlkm_modules_list_extra="${PREBUILTS}/vendor_dlkm.modules.include.extra"
         vendor_dlkm_modules_load_extra="${PREBUILTS}/vendor_dlkm.modules.load.extra"
         vendor_dlkm_modules_load="${VENDOR_DLKM_STAGING_ROOT}/modules.load"
         vendor_dlkm_modules_order="${VENDOR_DLKM_STAGING_ROOT}/modules.order"
@@ -1436,7 +1437,9 @@ runs:
         shopt -s nullglob
         for file in "${PREBUILTS}"/vendor_dlkm.modules.*; do
           prebuilt_file=$(basename "${file}")
-          if [[ "${prebuilt_file}" == "vendor_dlkm.modules.include" || "${prebuilt_file}" == "vendor_dlkm.modules.load.extra" ]]; then
+          if [[ "${prebuilt_file}" == "vendor_dlkm.modules.include" \
+          || "${prebuilt_file}" == "vendor_dlkm.modules.include.extra" \
+          ||  "${prebuilt_file}" == "vendor_dlkm.modules.load.extra" ]]; then
             continue
           fi
           cp "${file}" "${VENDOR_DLKM_STAGING_ROOT}/${prebuilt_file#vendor_dlkm.}"
@@ -1460,7 +1463,15 @@ runs:
         fi
 
         # Append extra modules for auto loading
-        if [[ -f "${vendor_dlkm_modules_load_extra}" ]]; then
+        if [[ -f "${vendor_dlkm_modules_list_extra}" && -f "${vendor_dlkm_modules_load_extra}" ]]; then
+          missing_extra_modules_list="$(mktemp)"
+          grep -v -F -x -f "${vendor_dlkm_modules_list_extra}" \
+            "${vendor_dlkm_modules_load_extra}" > "${missing_extra_modules_list}" || true
+          if [[ -s "${missing_extra_modules_list}" ]]; then
+            echo "The following modules present in modules.load.extra are absent in extra modules.include.extra :"
+            cat "${missing_extra_modules_list}"
+            exit 1
+          fi
           cat "${vendor_dlkm_modules_load_extra}" >> "${vendor_dlkm_modules_load}"
         fi
 
@@ -1490,8 +1501,8 @@ runs:
           exit 1
         fi
 
-        # copy extra vendor_dlkm modules defined in prebuilt/vendor_dlkm.modules.load.extra
-        if [[ -f "${vendor_dlkm_modules_load_extra}" ]]; then
+        # copy extra vendor_dlkm modules defined in prebuilt/vendor_dlkm.modules.include.extra
+        if [[ -f "${vendor_dlkm_modules_list_extra}" ]]; then
           cd "${MODULES_STAGING_ROOT}"
           missing_modules_extra=$(mktemp)
           while IFS= read -r module_extra || [[ -n "${module_extra}" ]]; do
@@ -1503,7 +1514,7 @@ runs:
               echo "WARNING: ${module_extra} not found" >&2
               echo "${module_extra}" >> "${missing_modules_extra}"
             fi
-          done < "${vendor_dlkm_modules_load_extra}"
+          done < "${vendor_dlkm_modules_list_extra}"
 
           if [[ -s "${missing_modules_extra}" ]]; then
             echo "::error:: The following vendor_dlkm modules are missing :"
@@ -1548,6 +1559,7 @@ runs:
         done
 
         sed -i 's/.*\///g' "${modules_order}"
+        sed -i "s/${QCACLD_DEV_NAME}\.ko/qca_cld3_${QCACLD_DEV_NAME}.ko/g" "${modules_order}"
 
         stripped_modules_order="$(mktemp)"
         grep -F -x -f "${vendor_dlkm_modules_list}" \
@@ -1555,7 +1567,7 @@ runs:
 
         if [[ -f "${vendor_dlkm_modules_load_extra}" ]]; then
           extra_modules_order="$(mktemp)"
-          grep -F -x -f "${vendor_dlkm_modules_load_extra}" \
+          grep -F -x -f "${vendor_dlkm_modules_list_extra}" \
             ${modules_order} > "${extra_modules_order}" || true
         fi
 
