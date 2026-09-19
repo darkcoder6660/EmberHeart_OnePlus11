@@ -1409,7 +1409,7 @@ runs:
         DEPMOD_MODULES_ROOT="${DEPMOD_DIR_ROOT}/vendor/lib/modules"
 
         vendor_dlkm_modules_list="${PREBUILTS}/vendor_dlkm.modules.include"
-        vendor_dlkm_modules_extra="${PREBUILTS}/vendor_dlkm.modules.load.extra"
+        vendor_dlkm_modules_load_extra="${PREBUILTS}/vendor_dlkm.modules.load.extra"
         vendor_dlkm_modules_load="${VENDOR_DLKM_STAGING_ROOT}/modules.load"
         vendor_dlkm_modules_order="${VENDOR_DLKM_STAGING_ROOT}/modules.order"
 
@@ -1457,8 +1457,8 @@ runs:
         fi
 
         # Append extra modules for auto loading
-        if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
-          cat "${vendor_dlkm_modules_extra}" >> "${vendor_dlkm_modules_load}"
+        if [[ -f "${vendor_dlkm_modules_load_extra}" ]]; then
+          cat "${vendor_dlkm_modules_load_extra}" >> "${vendor_dlkm_modules_load}"
         fi
 
         # copy modules to DEPMOD_MODULES_ROOT
@@ -1488,7 +1488,7 @@ runs:
         fi
 
         # copy extra vendor_dlkm modules defined in prebuilt/vendor_dlkm.modules.load.extra
-        if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
+        if [[ -f "${vendor_dlkm_modules_load_extra}" ]]; then
           cd "${MODULES_STAGING_ROOT}"
           missing_modules_extra=$(mktemp)
           while IFS= read -r module_extra || [[ -n "${module_extra}" ]]; do
@@ -1500,7 +1500,7 @@ runs:
               echo "WARNING: ${module_extra} not found" >&2
               echo "${module_extra}" >> "${missing_modules_extra}"
             fi
-          done < "${vendor_dlkm_modules_extra}"
+          done < "${vendor_dlkm_modules_load_extra}"
 
           if [[ -s "${missing_modules_extra}" ]]; then
             echo "::error:: The following vendor_dlkm modules are missing :"
@@ -1550,27 +1550,27 @@ runs:
         grep -F -x -f "${vendor_dlkm_modules_list}" \
           ${modules_order} > "${stripped_modules_order}" || true
 
-        if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
+        if [[ -f "${vendor_dlkm_modules_load_extra}" ]]; then
           extra_modules_order="$(mktemp)"
-          grep -F -x -f "${vendor_dlkm_modules_extra}" \
+          grep -F -x -f "${vendor_dlkm_modules_load_extra}" \
             ${modules_order} > "${extra_modules_order}" || true
         fi
 
         if [[ "${VENDOR_DLKM_HAS_MODULES_ORDER:-0}" == "1" ]]; then
           cat "${stripped_modules_order}" > "${vendor_dlkm_modules_order}"
 
-          if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
+          if [[ -f "${vendor_dlkm_modules_load_extra}" ]]; then
             cat "${extra_modules_order}" >> "${vendor_dlkm_modules_order}"
           fi
         fi
 
         # invert match modules.order with the modules we have included in vendor_boot and vendor_dlkm, this will be used to generate
         # modules.load.extra by manual resolution
-        if [[ -f "${vendor_dlkm_modules_extra}" ]]; then
-          grep -v -F -x -f "${DIST_DIR}/vendor_boot.modules.load" "${vendor_dlkm_modules_list}" "${vendor_dlkm_modules_extra}" \
+        if [[ -f "${vendor_dlkm_modules_load_extra}" ]]; then
+          grep -v -F -x -f "${DIST_DIR}/vendor_boot.modules.load" -f "${vendor_dlkm_modules_list}" -f "${vendor_dlkm_modules_load_extra}" \
            ${modules_order} > "${DIST_DIR}/modules.kbuild.extra"
         else
-          grep -v -F -x -f "${DIST_DIR}/vendor_boot.modules.load" "${vendor_dlkm_modules_list}" \
+          grep -v -F -x -f "${DIST_DIR}/vendor_boot.modules.load" -f "${vendor_dlkm_modules_list}" \
            ${modules_order} > "${DIST_DIR}/modules.kbuild.extra"
         fi
 
