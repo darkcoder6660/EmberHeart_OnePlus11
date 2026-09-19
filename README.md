@@ -11,7 +11,7 @@
 > [!CAUTION]
 > ## Your warranty is no longer valid!
 >
-> I am not responsible for bricked devices, dead SD cards, thermonuclear war, or the current economic crisis. Please do some research if you have any concerns about features included in this kernel before flashing it! YOU are choosing to make these modifications, and if you point your finger at me for messing up your device, I will laugh at you.
+> I am not responsible for bricked devices, dead SD cards, thermonuclear war, or the current economic crisis. Please do some research if you have any concerns about features included in this kernel before flashing it! YOU are choosing to make these modifications, and if you point your finger at me for messing up your device, I will laugh at you. (jk)
 
 ----
 
@@ -20,7 +20,8 @@
 >
 > - Flash AK3 zip in kernel flasher
 > - Flash Wireless Firmware for Nethunter provided in the releases
-> - Download and Unzip kernel modules in internal storage and load them using `insmod module_name.ko`
+> - Flash vendor_boot, system_dlkm and vendor_dlkm for supported devices 
+> - [Skip this step if vendor_boot, system_dlkm and vendor_dlkm is available] Download and Unzip kernel modules in internal storage and load them using `insmod module_name.ko`
 
 ----
 
@@ -30,8 +31,9 @@
 > - [Nethuner Wireless Firmware](https://github.com/nullptr-t-oss/Nethunter-Wireless-Firmware/releases/latest)
 > - [Guide to fix Unusually long boot times on A16 when using Nethunter](docs/a16_fix.md)
 > - [Loading chipset drivers](docs/drivers.md)
-> - [Porting Kernel for other OnePlus devices (GKI2 - i.e. kernel 5.10 or above)](docs/porting.md)
-> - [Guide to use build config for device specific build customization](docs/BUILD_CONFIG_HOOKS.md)
+> - [Porting Kernel for other OnePlus devices (GKI2 - i.e. kernel 5.10 or above)](docs/porting.md) (old - to be updated ; Join telegram group for help with porting)
+> - [Guide to use build config for device specific build customization](docs/BUILD_CONFIG_HOOKS.md) (old - to be updated ; Join telegram group for help with build config)
+> - [Telegram Channel for Support](https://t.me/init_user0)
 
 ----
 
