@@ -212,7 +212,8 @@ runs:
           "${DIST_DIR}/modules.tar.gz" \
           "${DIST_DIR}/system_dlkm.img" \
           "${DIST_DIR}/vendor_boot.img" \
-          "${DIST_DIR}/vendor_dlkm.img"; do
+          "${DIST_DIR}/vendor_dlkm.img" \
+          "${{ steps.download_external.outputs.dir }}"/*.zip; do
           [ -f "$f" ] && FILE_ARGS+=(--file "$f")
         done
 
@@ -288,7 +289,8 @@ runs:
           "${DIST_DIR}/modules.tar.gz" \
           "${DIST_DIR}/system_dlkm.img" \
           "${DIST_DIR}/vendor_boot.img" \
-          "${DIST_DIR}/vendor_dlkm.img"; do
+          "${DIST_DIR}/vendor_dlkm.img" \
+          "${{ steps.download_external.outputs.dir }}"/*.zip; do
           [ -f "$f" ] && FILE_ARGS+=(--file "$f")
         done
 
