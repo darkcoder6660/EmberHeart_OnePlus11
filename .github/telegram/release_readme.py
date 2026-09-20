@@ -96,22 +96,26 @@ def build_device_table(args: argparse.Namespace) -> str:
 def build_notes(args: argparse.Namespace, feats: dict[str, list[bi.Feature]], entries: list[bi.FileEntry]) -> str:
     parts = [build_intro(args), build_device_table(args)]
 
+    banner_lines = [
+        "![GitHub-Mark-Light](https://raw.githubusercontent.com/nullptr-t-oss/Dragonw1nd-Kernels/refs/heads/main/assets/banner_light.svg#gh-light-mode-only)"
+        "![GitHub-Mark-Dark ](https://raw.githubusercontent.com/nullptr-t-oss/Dragonw1nd-Kernels/refs/heads/main/assets/banner_dark.svg#gh-dark-mode-only)"
+    ]
+    parts.append("\n".join(banner_lines))
+
     feature_lines = ["### Features", ""]
     if feats:
-        feature_lines += ["<details>", "<summary>What's Inside</summary>", ""]
         for category, items in feats.items():
             feature_lines.append(f"#### {category}")
             for it in items:
                 feature_lines.append(f"- **{it.name}**: {it.description}")
             feature_lines.append("")
-        feature_lines.append("</details>")
         feature_lines.append("")
 
-    feature_lines.append(f"- [+] KernelSU-Next {args.ksun_tag} ( {args.ksun_version} )")
+    feature_lines.append(f"- **KernelSU-Next** {args.ksun_tag} ( {args.ksun_version} )")
     if args.susfs_version:
-        feature_lines.append(f"- [+] SUSFS {args.susfs_version}")
+        feature_lines.append(f"- **SUSFS** {args.susfs_version}")
     for f in STATIC_FEATURES:
-        feature_lines.append(f"- [+] {f}")
+        feature_lines.append(f"- {f}")
     parts.append("\n".join(feature_lines))
 
     parts.append(
@@ -124,11 +128,36 @@ def build_notes(args: argparse.Namespace, feats: dict[str, list[bi.Feature]], en
         f"> Codename: {args.codename}",
         f"> Supported OS version: {args.os_name}",
     ]
-    important_lines.append(f"\n```")
+    important_lines.append(f"\nSHA256 Checksums:\n```")
     for e in entries:
-        important_lines.append(f"> {os.path.basename(e.path)} hash : {e.sha256}")
+        important_lines.append(f"{os.path.basename(e.path)} hash : {e.sha256}")
     important_lines.append(f"```")
     parts.append("\n".join(important_lines))
+
+    flash_instructions = [
+        "### Flashing Instructions",
+        "#### To temporarily boot a boot image:",
+        "```",
+        "adb reboot bootloader",
+        "fastboot boot <location of boot.img>",
+        "```",
+        "",
+        "#### To flash all partitions (if provided):",
+        "```",
+        "adb reboot bootloader",
+        "fastboot flash boot <location of boot.img>",
+        "fastboot reboot fastboot",
+        "fastboot flash system_dlkm <location of system_dlkm.img>",
+        "fastboot flash vendor_boot <location of vendor_boot.img>",
+        "fastboot flash vendor_dlkm <location of vendor_dlkm.img>",
+        "```",
+        "",
+        "> [!NOTE]",
+        "> I never recommend anyone to `flash` the boot image. Always temporarily boot the boot image to gain temporary root access and then flash the provided AnyKernel3 using [kernel flasher](https://github.com/fatalcoder524/KernelFlasher)"
+    ]
+    parts.append("\n".join(flash_instructions))
+
+    parts.append("\n###### Team Dragonw1nd")
 
     return "\n\n".join(parts) + "\n"
 

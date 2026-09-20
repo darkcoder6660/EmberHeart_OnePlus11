@@ -278,7 +278,17 @@ runs:
         done
 
         FILE_ARGS=()
-        for f in "${DIST_DIR}"/*.{zip,img}; do
+        for f in \
+          "${DIST_DIR}/${AK3_ZIP}" \
+          "${DIST_DIR}/boot.img" \
+          "${DIST_DIR}/ksun.apk" \
+          "${DIST_DIR}/ksun_spoofed.apk" \
+          "${DIST_DIR}/modules.zip" \
+          "${DIST_DIR}/gki-modules.tar.gz" \
+          "${DIST_DIR}/modules.tar.gz" \
+          "${DIST_DIR}/system_dlkm.img" \
+          "${DIST_DIR}/vendor_boot.img" \
+          "${DIST_DIR}/vendor_dlkm.img"; do
           [ -f "$f" ] && FILE_ARGS+=(--file "$f")
         done
 
