@@ -343,7 +343,18 @@ runs:
         GH_TOKEN: ${{ inputs.gh_token }}
       run: |
         set -euo pipefail
-        for f in "${DIST_DIR}"/*.{zip,img} "${{ steps.download_external.outputs.dir }}"/*.zip; do
+        for f in \
+          "${DIST_DIR}/${AK3_ZIP}" \
+          "${DIST_DIR}/boot.img" \
+          "${DIST_DIR}/ksun.apk" \
+          "${DIST_DIR}/ksun_spoofed.apk" \
+          "${DIST_DIR}/modules.zip" \
+          "${DIST_DIR}/gki-modules.tar.gz" \
+          "${DIST_DIR}/modules.tar.gz" \
+          "${DIST_DIR}/system_dlkm.img" \
+          "${DIST_DIR}/vendor_boot.img" \
+          "${DIST_DIR}/vendor_dlkm.img" \
+          "${{ steps.download_external.outputs.dir }}"/*.zip; do
           if [ -f "$f" ]; then
             echo "Uploading ${f}..."
             gh release upload "${NEW_TAG}" "${f}" --repo "${{ github.repository }}" --clobber
