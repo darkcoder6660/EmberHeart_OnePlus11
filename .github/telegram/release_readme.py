@@ -94,13 +94,15 @@ def build_device_table(args: argparse.Namespace) -> str:
 
 
 def build_notes(args: argparse.Namespace, feats: dict[str, list[bi.Feature]], entries: list[bi.FileEntry]) -> str:
-    parts = [build_intro(args), build_device_table(args)]
+    parts = []
 
     banner_lines = [
         "![GitHub-Mark-Light](https://raw.githubusercontent.com/nullptr-t-oss/Dragonw1nd-Kernels/refs/heads/main/assets/banner_light.svg#gh-light-mode-only)"
         "![GitHub-Mark-Dark ](https://raw.githubusercontent.com/nullptr-t-oss/Dragonw1nd-Kernels/refs/heads/main/assets/banner_dark.svg#gh-dark-mode-only)"
     ]
     parts.append("\n".join(banner_lines))
+    parts.append(build_intro(args))
+    parts.append(build_device_table(args))
 
     feature_lines = ["### Features", ""]
     if feats:
